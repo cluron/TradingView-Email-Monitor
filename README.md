@@ -129,21 +129,30 @@ Pour exécuter le script en continu sur un serveur (ex: Raspberry Pi) sans inter
 sudo apt update && sudo apt install tmux -y
 ```
 
-#### 2. Démarrage du script
+#### 2. Démarrage manuel des scripts
 ```bash
 # Créer une nouvelle session tmux
 tmux new -s tradingview
 
-# Dans la session tmux, lancer le script
+# Diviser la fenêtre horizontalement en deux panneaux
+tmux split-window -h
+
+# Dans le panneau de gauche (par défaut), lancer le premier script
 python3 icloud-Webhook.py --mode local  # ou --mode public selon votre cas
+
+# Passer au panneau de droite
+Ctrl + B, puis flèche droite
+
+# Lancer le second script
+python3 src/main.py live --local
 ```
 
 #### 3. Commandes tmux essentielles
-- `Ctrl + B, D` : Se détacher de la session (le script continue en arrière-plan)
-- `Ctrl + B, C` : Créer une nouvelle fenêtre
-- `Ctrl + B, N` : Passer à la fenêtre suivante
-- `Ctrl + B, P` : Passer à la fenêtre précédente
+- `Ctrl + B, D` : Se détacher de la session (les scripts continuent en arrière-plan)
+- `Ctrl + B, flèche` : Naviguer entre les panneaux
 - `Ctrl + B, [` : Mode défilement (utilisez les flèches, `q` pour quitter)
+- `Ctrl + B, x` : Fermer le panneau courant
+- `Ctrl + B, z` : Zoomer/dézoomer sur le panneau courant
 
 #### 4. Gestion des sessions
 ```bash
@@ -153,12 +162,89 @@ tmux ls
 # Se rattacher à une session existante
 tmux attach -t tradingview
 
-# Tuer une session (et le script)
+# Tuer une session (et les scripts)
 tmux kill-session -t tradingview
 ```
 
-#### 5. Bonnes pratiques
-- Utilisez des noms de session explicites (ex: `tradingview`)
-- Une session par script pour une meilleure organisation
-- Vérifiez régulièrement les logs pour vous assurer du bon fonctionnement
-- Configurez des alertes en cas d'erreur critique 
+### Démarrage automatique au boot
+
+Pour que vos scripts démarrent automatiquement dans tmux au démarrage du Raspberry Pi :
+
+#### 1. Créer le script de démarrage
+```bash
+# Créer et éditer le script
+nano ~/start_trading.sh
+```
+
+Copier ce contenu :
+```bash
+#!/bin/bash
+
+# Attendre que le système soit complètement démarré
+sleep 10
+
+# Vérifier si la session existe déjà
+tmux has-session -t tradingview 2>/dev/null
+
+if [ $? != 0 ]; then
+    # Créer une nouvelle session
+    tmux new-session -d -s tradingview
+
+    # Diviser la fenêtre en deux panneaux
+    tmux split-window -h
+
+    # Panneau gauche : icloud-Webhook.py
+    tmux select-pane -t 0
+    tmux send-keys "cd $(dirname $(readlink -f $0))" C-m
+    tmux send-keys "python3 icloud-Webhook.py --mode local" C-m
+
+    # Panneau droit : main.py
+    tmux select-pane -t 1
+    tmux send-keys "cd $(dirname $(readlink -f $0))" C-m
+    tmux send-keys "python3 src/main.py live --local" C-m
+
+    # Revenir au panneau gauche
+    tmux select-pane -t 0
+fi
+```
+
+#### 2. Rendre le script exécutable
+```bash
+chmod +x ~/start_trading.sh
+```
+
+#### 3. Configurer le démarrage automatique
+```bash
+# Éditer le crontab
+crontab -e
+
+# Ajouter cette ligne (adaptez le chemin)
+@reboot /home/pi/start_trading.sh
+```
+
+#### 4. Test et vérification
+```bash
+# Tester sans redémarrer
+~/start_trading.sh
+
+# Vérifier que les scripts tournent
+tmux attach -t tradingview
+```
+
+Vous devriez voir deux panneaux côte à côte avec les logs des deux scripts.
+
+#### 5. Démarrage complet
+```bash
+# Redémarrer pour tester
+sudo reboot
+
+# Après redémarrage, se connecter en SSH et vérifier
+tmux attach -t tradingview
+```
+
+#### 6. Bonnes pratiques
+- Vérifiez les logs régulièrement
+- Configurez des alertes en cas d'erreur
+- Faites des sauvegardes du script de démarrage
+- Documentez les modifications apportées
+- Testez après chaque mise à jour système 
