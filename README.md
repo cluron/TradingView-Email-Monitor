@@ -216,12 +216,17 @@ Copier ce contenu :
 ```ini
 [Unit]
 Description=TradingView Email Monitor Service
-After=network.target
+# Attendre que le réseau ET la synchronisation NTP soient prêts
+After=network.target time-sync.target
+# S'assurer que l'heure est synchronisée avant de démarrer
+Requires=time-sync.target
 
 [Service]
 Type=forking
 User=bot
 Environment="TMUX="
+# Ajouter un délai de sécurité pour la synchronisation complète
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/local/bin/start-trading-services.sh
 ExecStop=/usr/bin/tmux kill-session -t tradingview
 Restart=always
