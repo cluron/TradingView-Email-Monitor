@@ -107,7 +107,7 @@ def check_email(mail, webhook_url):
 
         for e_id in messages[0].split():
             # Nouvelle ligne uniquement quand on a un email à traiter
-            print("\n[📧] Traitement de l'email ID : {e_id}")
+            print(f"\n[📧] Traitement de l'email ID : {e_id}")
             
             # Récupération du message avec BODY[] au lieu de RFC822
             status, msg_data = mail.fetch(e_id, '(BODY[])')
