@@ -170,7 +170,43 @@ tmux kill-session -t tradingview
 
 Pour que vos scripts démarrent automatiquement au boot avec une gestion propre des processus et des logs :
 
-#### 1. Créer le service systemd pour TradingView Monitor
+#### 1. Créer le script de lancement
+```bash
+# Créer le script de lancement
+sudo nano /usr/local/bin/start-trading-services.sh
+```
+
+Copier ce contenu :
+```bash
+#!/bin/bash
+
+# Nettoyer toute session existante
+tmux kill-session -t tradingview 2>/dev/null || true
+rm -f /tmp/tmux-*/default
+
+# Créer la session avec le premier script
+tmux new-session -d -s tradingview
+tmux send-keys -t tradingview "cd /home/bot/TradingView-Email-Monitor" C-m
+tmux send-keys -t tradingview "python3 icloud-Webhook.py --mode local" C-m
+
+# Attendre un peu que la première commande démarre
+sleep 2
+
+# Créer le second panneau et lancer le second script
+tmux split-window -h -t tradingview
+tmux send-keys -t tradingview:0.1 "cd /home/bot/cryptoBot-Future-Trend-Channel" C-m
+tmux send-keys -t tradingview:0.1 "python3 src/main.py live --local" C-m
+
+# Retourner au premier panneau
+tmux select-pane -t tradingview:0.0
+```
+
+Rendre le script exécutable :
+```bash
+sudo chmod +x /usr/local/bin/start-trading-services.sh
+```
+
+#### 2. Créer le service systemd
 ```bash
 # Créer le fichier de service
 sudo nano /etc/systemd/system/tradingview-monitor.service
@@ -186,32 +222,13 @@ After=network.target
 Type=forking
 User=bot
 Environment="TMUX="
-WorkingDirectory=/home/bot/TradingView-Email-Monitor
-ExecStartPre=/bin/rm -f /tmp/tmux-1000/default
-ExecStart=/bin/bash -c '\
-    /usr/bin/tmux new-session -d -s tradingview \
-        "cd /home/bot/TradingView-Email-Monitor && python3 icloud-Webhook.py --mode local" && \
-    /usr/bin/tmux split-window -t tradingview -h \
-        "cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local" && \
-    /usr/bin/tmux select-pane -t tradingview:0.0'
+ExecStart=/usr/local/bin/start-trading-services.sh
 ExecStop=/usr/bin/tmux kill-session -t tradingview
 Restart=always
 RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
-```
-
-#### 2. Activer et démarrer le service
-```bash
-# Recharger la configuration systemd
-sudo systemctl daemon-reload
-
-# Activer le service au démarrage
-sudo systemctl enable tradingview-monitor
-
-# Démarrer le service
-sudo systemctl start tradingview-monitor
 ```
 
 #### 3. Gestion du service
