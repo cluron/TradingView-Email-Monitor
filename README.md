@@ -187,9 +187,13 @@ Type=forking
 User=bot
 Environment="TMUX="
 WorkingDirectory=/home/bot/TradingView-Email-Monitor
-ExecStart=/bin/bash -c '/usr/bin/tmux new-session -d -s tradingview \
-    "python3 /home/bot/TradingView-Email-Monitor/icloud-Webhook.py --mode local" \; \
-    split-window -h "cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local"'
+ExecStartPre=/bin/rm -f /tmp/tmux-1000/default
+ExecStart=/bin/bash -c '\
+    /usr/bin/tmux new-session -d -s tradingview \
+        "cd /home/bot/TradingView-Email-Monitor && python3 icloud-Webhook.py --mode local" && \
+    /usr/bin/tmux split-window -t tradingview -h \
+        "cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local" && \
+    /usr/bin/tmux select-pane -t tradingview:0.0'
 ExecStop=/usr/bin/tmux kill-session -t tradingview
 Restart=always
 RestartSec=30
