@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/cluron/TradingView-Email-Monitor)](https://github.com/cluron/TradingView-Email-Monitor/releases)
+[![Release](https://img.shields.io/github/release/cluron/TradingView-Email-Monitor.svg)](https://github.com/cluron/TradingView-Email-Monitor/releases)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/cluron/TradingView-Email-Monitor/graphs/commit-activity)
 
 Ce script Python surveille les emails de TradingView et transmet les signaux de trading à un serveur webhook.
@@ -27,8 +27,8 @@ Ce script Python surveille les emails de TradingView et transmet les signaux de 
 
 1. Clonez le repository :
 ```bash
-git clone https://github.com/votre-username/tradingview-email-monitor.git
-cd tradingview-email-monitor
+git clone https://github.com/cluron/TradingView-Email-Monitor.git
+cd TradingView-Email-Monitor
 ```
 
 2. Installez les dépendances :
