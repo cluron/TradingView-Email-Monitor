@@ -112,3 +112,53 @@ Les contributions sont les bienvenues ! N'hésitez pas à :
 3. Commiter vos changements
 4. Pousser vers la branche
 5. Ouvrir une Pull Request 
+
+## 🚀 Déploiement
+
+### Exécution en arrière-plan avec tmux
+
+Pour exécuter le script en continu sur un serveur (ex: Raspberry Pi) sans interface graphique, nous recommandons l'utilisation de `tmux`. Cette solution permet de :
+- Exécuter le script en arrière-plan
+- Visualiser les logs à tout moment
+- Se reconnecter à la session même après déconnexion SSH
+- Gérer plusieurs scripts dans différentes fenêtres
+
+#### 1. Installation de tmux
+```bash
+# Sur Debian/Ubuntu/Raspberry Pi OS
+sudo apt update && sudo apt install tmux -y
+```
+
+#### 2. Démarrage du script
+```bash
+# Créer une nouvelle session tmux
+tmux new -s tradingview
+
+# Dans la session tmux, lancer le script
+python3 icloud-Webhook.py --mode local  # ou --mode public selon votre cas
+```
+
+#### 3. Commandes tmux essentielles
+- `Ctrl + B, D` : Se détacher de la session (le script continue en arrière-plan)
+- `Ctrl + B, C` : Créer une nouvelle fenêtre
+- `Ctrl + B, N` : Passer à la fenêtre suivante
+- `Ctrl + B, P` : Passer à la fenêtre précédente
+- `Ctrl + B, [` : Mode défilement (utilisez les flèches, `q` pour quitter)
+
+#### 4. Gestion des sessions
+```bash
+# Lister les sessions tmux actives
+tmux ls
+
+# Se rattacher à une session existante
+tmux attach -t tradingview
+
+# Tuer une session (et le script)
+tmux kill-session -t tradingview
+```
+
+#### 5. Bonnes pratiques
+- Utilisez des noms de session explicites (ex: `tradingview`)
+- Une session par script pour une meilleure organisation
+- Vérifiez régulièrement les logs pour vous assurer du bon fonctionnement
+- Configurez des alertes en cas d'erreur critique 
