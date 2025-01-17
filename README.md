@@ -183,13 +183,14 @@ Description=TradingView Email Monitor Service
 After=network.target
 
 [Service]
-Type=simple
+Type=forking
 User=bot
+Environment="TMUX="
 WorkingDirectory=/home/bot/TradingView-Email-Monitor
-ExecStart=/usr/bin/tmux new-session -d -s tradingview \; \
-          send-keys 'python3 icloud-Webhook.py --mode local' C-m \; \
-          split-window -h \; \
-          send-keys 'cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local' C-m
+ExecStart=/bin/bash -c '/usr/bin/tmux new-session -d -s tradingview \
+    "python3 /home/bot/TradingView-Email-Monitor/icloud-Webhook.py --mode local" \; \
+    split-window -h "cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local"'
+ExecStop=/usr/bin/tmux kill-session -t tradingview
 Restart=always
 RestartSec=30
 
