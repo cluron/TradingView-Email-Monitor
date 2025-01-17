@@ -96,97 +96,93 @@ HEADERS = {
 
 def check_email(mail, webhook_url):
     try:
-        print("\n[🔍] Recherche des emails non lus de TradingView...")
+        # Utilisation de \r pour rester sur la même ligne et effacer le contenu précédent
+        print("\r[🔍] Surveillance active... ", end="", flush=True)
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
 
         if status != "OK" or not messages[0]:
+            # Ajoute un point pour montrer que le script est actif
+            print(".", end="", flush=True)
             return
 
         for e_id in messages[0].split():
-            try:
-                print(f"[📧] Traitement de l'email ID : {e_id}")
-                
-                # Récupération du message avec BODY[] au lieu de RFC822
-                status, msg_data = mail.fetch(e_id, '(BODY[])')
-                print(f"[📝] Status de récupération : {status}")
-                
-                # Vérification détaillée du format
-                if not msg_data or not msg_data[0]:
-                    print("[❌] msg_data est vide ou invalide")
-                    continue
-
-                # Extraction du contenu brut de l'email
-                raw_email = None
-                for part in msg_data:
-                    if isinstance(part, tuple) and len(part) > 1:
-                        raw_email = part[1]
-                        break
-
-                if not raw_email or not isinstance(raw_email, bytes):
-                    print(f"[❌] Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
-                    continue
-
-                email_msg = email.message_from_bytes(raw_email)
-                
-                # Extraction du signal (corps du message)
-                payload = None
-                if email_msg.is_multipart():
-                    for part in email_msg.walk():
-                        if part.get_content_type() == "text/plain":
-                            payload = part.get_payload(decode=True)
-                            break
-                else:
-                    payload = email_msg.get_payload(decode=True)
-
-                if not payload:
-                    print("[❌] Aucun contenu text/plain trouvé dans l'email")
-                    continue
-
-                signal = payload.decode('utf-8').strip()
-                # On n'affiche plus le contenu du mail
-                
-                # Vérification et envoi du signal
-                if "BUY" in signal:
-                    signal = "BUY"
-                elif "SELL" in signal:
-                    signal = "SELL"
-                else:
-                    print(f"[❌] Signal invalide détecté")
-                    continue
-
-                print(f"[✅] Signal valide détecté : {signal}")
-                payload = {"side": signal}
-                
-                try:
-                    # Envoi au webhook
-                    response = requests.post(webhook_url, json=payload, headers=HEADERS)
-                    print(f"[🚀] Signal envoyé, réponse : {response.status_code}")
-                except requests.exceptions.ConnectionError:
-                    print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
-                    print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
-                    continue
-                except Exception as e:
-                    print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
-                    continue
-                
-                # Marquer comme lu
-                mail.store(e_id, "+FLAGS", "\\Seen")
-                print("[✓] Email marqué comme lu")
-
-            except Exception as e:
-                print(f"[❌] Erreur lors du traitement d'un email : {e}")
-                print(f"[📝] Détails de l'erreur : {str(e)}")
+            # Nouvelle ligne uniquement quand on a un email à traiter
+            print("\n[📧] Traitement de l'email ID : {e_id}")
+            
+            # Récupération du message avec BODY[] au lieu de RFC822
+            status, msg_data = mail.fetch(e_id, '(BODY[])')
+            
+            # Vérification détaillée du format
+            if not msg_data or not msg_data[0]:
+                print("[❌] msg_data est vide ou invalide")
                 continue
 
+            # Extraction du contenu brut de l'email
+            raw_email = None
+            for part in msg_data:
+                if isinstance(part, tuple) and len(part) > 1:
+                    raw_email = part[1]
+                    break
+
+            if not raw_email or not isinstance(raw_email, bytes):
+                print(f"[❌] Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
+                continue
+
+            email_msg = email.message_from_bytes(raw_email)
+            
+            # Extraction du signal (corps du message)
+            payload = None
+            if email_msg.is_multipart():
+                for part in email_msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        payload = part.get_payload(decode=True)
+                        break
+            else:
+                payload = email_msg.get_payload(decode=True)
+
+            if not payload:
+                print("[❌] Aucun contenu text/plain trouvé dans l'email")
+                continue
+
+            signal = payload.decode('utf-8').strip()
+            
+            # Vérification et envoi du signal
+            if "BUY" in signal:
+                signal = "BUY"
+            elif "SELL" in signal:
+                signal = "SELL"
+            else:
+                print(f"[❌] Signal invalide détecté")
+                continue
+
+            print(f"[✅] Signal valide détecté : {signal}")
+            payload = {"side": signal}
+            
+            try:
+                # Envoi au webhook
+                response = requests.post(webhook_url, json=payload, headers=HEADERS)
+                print(f"[🚀] Signal envoyé, réponse : {response.status_code}")
+            except requests.exceptions.ConnectionError:
+                print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
+                print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
+                continue
+            except Exception as e:
+                print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
+                continue
+            
+            # Marquer comme lu
+            mail.store(e_id, "+FLAGS", "\\Seen")
+            print("[✓] Email marqué comme lu")
+
     except Exception as e:
-        print(f"[❌] Erreur lors de la vérification des emails : {e}")
+        print(f"\n[❌] Erreur lors de la vérification des emails : {e}")
         print(f"[📝] Détails de l'erreur : {str(e)}")
 
 def main():
     # Parse les arguments
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
-    print(f"[⚙️] Mode serveur : {args.mode} ({webhook_url})")
+    print(f"[⚙️] Mode du serveur webhook : {args.mode} ({webhook_url})")
 
     try:
         while True:
@@ -195,7 +191,7 @@ def main():
                 mail = imaplib.IMAP4_SSL(IMAP_SERVER)
                 mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
                 mail.select("inbox")
-                print("[✅] Connecté")
+                print("[✅] Connecté et prêt à surveiller les emails de TradingView")
 
                 while True:
                     check_email(mail, webhook_url)
