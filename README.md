@@ -166,85 +166,73 @@ tmux attach -t tradingview
 tmux kill-session -t tradingview
 ```
 
-### Démarrage automatique au boot
+### Démarrage automatique avec systemd
 
-Pour que vos scripts démarrent automatiquement dans tmux au démarrage du Raspberry Pi :
+Pour que vos scripts démarrent automatiquement au boot avec une gestion propre des processus et des logs :
 
-#### 1. Créer le script de démarrage
+#### 1. Créer le service systemd pour TradingView Monitor
 ```bash
-# Créer et éditer le script
-nano ~/start_trading.sh
+# Créer le fichier de service
+sudo nano /etc/systemd/system/tradingview-monitor.service
 ```
 
 Copier ce contenu :
-```bash
-#!/bin/bash
+```ini
+[Unit]
+Description=TradingView Email Monitor Service
+After=network.target
 
-# Attendre que le système soit complètement démarré
-sleep 10
+[Service]
+Type=simple
+User=bot
+WorkingDirectory=/home/bot/TradingView-Email-Monitor
+ExecStart=/usr/bin/tmux new-session -d -s tradingview \; \
+          send-keys 'python3 icloud-Webhook.py --mode local' C-m \; \
+          split-window -h \; \
+          send-keys 'cd /home/bot/cryptoBot-Future-Trend-Channel && python3 src/main.py live --local' C-m
+Restart=always
+RestartSec=30
 
-# Vérifier si la session existe déjà
-tmux has-session -t tradingview 2>/dev/null
-
-if [ $? != 0 ]; then
-    # Créer une nouvelle session
-    tmux new-session -d -s tradingview
-
-    # Diviser la fenêtre en deux panneaux
-    tmux split-window -h
-
-    # Panneau gauche : icloud-Webhook.py
-    tmux select-pane -t 0
-    tmux send-keys "cd $(dirname $(readlink -f $0))" C-m
-    tmux send-keys "python3 icloud-Webhook.py --mode local" C-m
-
-    # Panneau droit : main.py
-    tmux select-pane -t 1
-    tmux send-keys "cd $(dirname $(readlink -f $0))" C-m
-    tmux send-keys "python3 src/main.py live --local" C-m
-
-    # Revenir au panneau gauche
-    tmux select-pane -t 0
-fi
+[Install]
+WantedBy=multi-user.target
 ```
 
-#### 2. Rendre le script exécutable
+#### 2. Activer et démarrer le service
 ```bash
-chmod +x ~/start_trading.sh
+# Recharger la configuration systemd
+sudo systemctl daemon-reload
+
+# Activer le service au démarrage
+sudo systemctl enable tradingview-monitor
+
+# Démarrer le service
+sudo systemctl start tradingview-monitor
 ```
 
-#### 3. Configurer le démarrage automatique
+#### 3. Gestion du service
 ```bash
-# Éditer le crontab
-crontab -e
+# Vérifier l'état du service
+sudo systemctl status tradingview-monitor
 
-# Ajouter cette ligne (adaptez le chemin)
-@reboot /home/pi/start_trading.sh
+# Voir les logs du service
+sudo journalctl -u tradingview-monitor -f
+
+# Arrêter le service
+sudo systemctl stop tradingview-monitor
+
+# Redémarrer le service
+sudo systemctl restart tradingview-monitor
 ```
 
-#### 4. Test et vérification
+#### 4. Accéder aux scripts en cours d'exécution
 ```bash
-# Tester sans redémarrer
-~/start_trading.sh
-
-# Vérifier que les scripts tournent
+# Se connecter à la session tmux
 tmux attach -t tradingview
 ```
 
-Vous devriez voir deux panneaux côte à côte avec les logs des deux scripts.
-
-#### 5. Démarrage complet
-```bash
-# Redémarrer pour tester
-sudo reboot
-
-# Après redémarrage, se connecter en SSH et vérifier
-tmux attach -t tradingview
-```
-
-#### 6. Bonnes pratiques
-- Vérifiez les logs régulièrement
-- Configurez des alertes en cas d'erreur
-- Faites des sauvegardes du script de démarrage
-- Documentez les modifications apportées
-- Testez après chaque mise à jour système 
+#### 5. Bonnes pratiques
+- Vérifiez régulièrement les logs avec `journalctl`
+- Configurez la rotation des logs si nécessaire
+- Surveillez l'utilisation des ressources
+- Testez le redémarrage automatique
+- Gardez une sauvegarde de la configuration systemd 
