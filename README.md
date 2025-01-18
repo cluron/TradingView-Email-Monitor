@@ -270,7 +270,7 @@ tmux attach -t tradingview
 
 ### Limite de signaux quotidiens
 Pour protéger contre les bugs potentiels ou les comportements erratiques des indicateurs, le script implémente une limite de signaux quotidiens :
-- Maximum de 10 signaux par jour
+- Maximum de 15 signaux par jour
 - Le compteur se réinitialise à minuit (UTC)
 - Au démarrage, le script analyse les emails de la journée pour compter les signaux déjà traités
 - Si la limite est atteinte, le script :
@@ -278,4 +278,12 @@ Pour protéger contre les bugs potentiels ou les comportements erratiques des in
   2. Ignore tous les signaux suivants jusqu'à la réinitialisation du compteur
   3. Affiche un avertissement dans les logs
 
-Cette sécurité évite les comportements erratiques en cas de dysfonctionnement des indicateurs tout en permettant de clôturer une position si nécessaire. 
+Cette sécurité évite les comportements erratiques en cas de dysfonctionnement des indicateurs tout en permettant de clôturer une position si nécessaire.
+
+## Utilisation manuelle
+
+### Arrêt du programme
+Pour arrêter proprement la surveillance des emails :
+1. Appuyez sur CTRL+C
+2. Le programme se déconnectera proprement d'iCloud
+3. Un message confirmera l'arrêt du programme 

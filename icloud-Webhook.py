@@ -96,7 +96,7 @@ HEADERS = {
 }
 
 # Sécurité : compteur de signaux
-MAX_DAILY_SIGNALS = 10
+MAX_DAILY_SIGNALS = 15
 signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
@@ -176,8 +176,8 @@ def check_email(mail, webhook_url):
         # Vérifier et réinitialiser le compteur si nécessaire
         reset_signal_counter()
         
-        # Surveillance sur la même ligne
-        print("\r[🔍] Surveillance active... ", end="", flush=True)
+        # Surveillance sur la même ligne avec message d'aide
+        print("\r[🔍] Surveillance active... (CTRL+C pour arrêter) ", end="", flush=True)
         
         try:
             # Vérifier que la connexion est toujours active
