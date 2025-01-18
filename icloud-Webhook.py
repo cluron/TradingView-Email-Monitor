@@ -157,7 +157,9 @@ def reset_signal_counter():
     current_date = datetime.now(timezone.utc).date()
     if current_date != last_signal_date:
         if signal_count > 0:
-            print(f"\n[📊] Réinitialisation du compteur de signaux (précédent : {signal_count})")
+            log_success(f"\n[📊] Réinitialisation du compteur de signaux quotidiens")
+            log_info(f"    ├── Précédent : {signal_count} signaux")
+            log_info(f"    └── Nouveau   : 0 signal")
         signal_count = 0
         last_signal_date = current_date
 
