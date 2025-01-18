@@ -264,3 +264,17 @@ tmux attach -t tradingview
 - Surveillez l'utilisation des ressources
 - Testez le redémarrage automatique
 - Gardez une sauvegarde de la configuration systemd 
+```
+
+## Mécanismes de sécurité
+
+### Limite de transactions quotidiennes
+Pour protéger contre les bugs potentiels ou les comportements erratiques des indicateurs, le script implémente une limite de transactions quotidiennes :
+- Maximum de 10 transactions par jour
+- Le compteur se réinitialise à minuit (UTC)
+- Si la limite est atteinte, le script :
+  1. Exécute le dernier SELL si c'est un signal de vente
+  2. Ignore tous les signaux suivants jusqu'à la réinitialisation du compteur
+  3. Affiche un avertissement dans les logs
+
+Cette sécurité évite de potentielles pertes dues à des commissions excessives en cas de dysfonctionnement des indicateurs. 

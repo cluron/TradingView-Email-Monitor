@@ -21,6 +21,7 @@ import time
 import argparse
 import sys
 from config import *
+from datetime import datetime, timezone
 
 # Couleurs pour le terminal
 class Colors:
@@ -94,8 +95,35 @@ HEADERS = {
     "X-WEBHOOK-TOKEN": WEBHOOK_TOKEN
 }
 
+# Sécurité : compteur de transactions
+MAX_DAILY_TRANSACTIONS = 10
+transaction_count = 0
+last_transaction_date = datetime.now(timezone.utc).date()
+
+def reset_transaction_counter():
+    global transaction_count, last_transaction_date
+    current_date = datetime.now(timezone.utc).date()
+    if current_date != last_transaction_date:
+        if transaction_count > 0:
+            print(f"\n[📊] Réinitialisation du compteur de transactions (précédent : {transaction_count})")
+        transaction_count = 0
+        last_transaction_date = current_date
+
+def check_transaction_limit(signal):
+    global transaction_count
+    if transaction_count >= MAX_DAILY_TRANSACTIONS:
+        if signal == "SELL":
+            print(f"\n[⚠️] Limite de {MAX_DAILY_TRANSACTIONS} transactions atteinte mais exécution du SELL final autorisée")
+            return True
+        print(f"\n[🛑] Limite de {MAX_DAILY_TRANSACTIONS} transactions atteinte - Signal ignoré jusqu'à demain")
+        return False
+    return True
+
 def check_email(mail, webhook_url):
     try:
+        # Vérifier et réinitialiser le compteur si nécessaire
+        reset_transaction_counter()
+        
         # Utilisation de \r pour rester sur la même ligne et effacer le contenu précédent
         print("\r[🔍] Surveillance active... ", end="", flush=True)
         
@@ -194,6 +222,16 @@ def check_email(mail, webhook_url):
 
         # Traiter uniquement le dernier signal valide si on en a trouvé un
         if last_valid_signal and last_valid_id:
+            # Vérifier la limite de transactions
+            if not check_transaction_limit(last_valid_signal):
+                # Marquer l'email comme lu même si on ne le traite pas
+                try:
+                    mail.store(last_valid_id, "+FLAGS", "\\Seen")
+                    print("[✓] Email marqué comme lu (limite de transactions atteinte)")
+                except Exception as e:
+                    print(f"[❌] Erreur lors du marquage de l'email : {e}")
+                return
+
             print(f"\n[🎯] Traitement du dernier signal valide : {last_valid_signal} (Email ID: {last_valid_id})")
             payload = {"side": last_valid_signal}
             
@@ -205,6 +243,10 @@ def check_email(mail, webhook_url):
                     # Marquer comme lu uniquement si l'envoi a réussi
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
                     print("[✓] Email du signal traité marqué comme lu")
+                    # Incrémenter le compteur de transactions
+                    global transaction_count
+                    transaction_count += 1
+                    print(f"[📊] Transactions aujourd'hui : {transaction_count}/{MAX_DAILY_TRANSACTIONS}")
                 else:
                     print(f"[❌] Erreur lors de l'envoi : code {response.status_code}")
                     print(f"[📝] Réponse : {response.text}")
@@ -224,6 +266,7 @@ def main():
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
     print(f"[⚙️] Mode du serveur webhook : {args.mode} ({webhook_url})")
+    print(f"[🛡️] Sécurité : Maximum {MAX_DAILY_TRANSACTIONS} transactions par jour")
 
     reconnect_delay = 10  # Délai initial de reconnexion en secondes
     max_reconnect_delay = 300  # Délai maximum de 5 minutes
