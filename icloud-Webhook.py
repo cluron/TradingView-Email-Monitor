@@ -369,10 +369,30 @@ def check_email(mail, webhook_url):
         log_error(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
         raise
 
+def display_banner():
+    """Affiche le titre et la description du script"""
+    banner = f"""
+{Colors.HEADER}{Colors.BOLD}╔══════════════════════════════════════════╗
+║     TradingView Email Monitor v1.11.0      ║
+╚══════════════════════════════════════════╝{Colors.ENDC}
+
+{Colors.BLUE}Ce script :{Colors.ENDC}
+• Surveille les emails provenant de TradingView
+• Détecte les signaux BUY/SELL dans les messages
+• Transmet les signaux au serveur de trading
+• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux par jour
+• Envoie une alerte si la limite est atteinte
+"""
+    print(banner)
+
 def main():
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
-    log_header(f"\n[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
+    
+    # Afficher le titre et la description
+    display_banner()
+    
+    log_header(f"[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
     log_header(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_SIGNALS} signaux par jour")
 
     reconnect_delay = 10
