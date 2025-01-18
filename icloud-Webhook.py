@@ -113,15 +113,23 @@ def check_email(mail, webhook_url):
             print(".", end="", flush=True)
             return
 
-        for e_id in messages[0].split():
+        # Récupérer tous les IDs d'emails non lus
+        email_ids = messages[0].split()
+        if len(email_ids) > 1:
+            print(f"\n[⚠️] Attention: {len(email_ids)} emails non lus détectés")
+
+        # On va d'abord identifier le dernier email avec un signal valide
+        last_valid_signal = None
+        last_valid_id = None
+        
+        # Parcourir les emails dans l'ordre inverse (du plus récent au plus ancien)
+        for e_id in reversed(email_ids):
             try:
-                # Nouvelle ligne uniquement quand on a un email à traiter
-                print(f"\n[📧] Traitement de l'email ID : {e_id}")
+                print(f"\n[📧] Analyse de l'email ID : {e_id}")
                 
-                # Récupération du message avec BODY[] au lieu de RFC822
+                # Récupération du message
                 status, msg_data = mail.fetch(e_id, '(BODY[])')
                 
-                # Vérification détaillée du format
                 if not msg_data or not msg_data[0]:
                     print("[❌] msg_data est vide ou invalide")
                     continue
@@ -155,44 +163,56 @@ def check_email(mail, webhook_url):
 
                 signal = payload.decode('utf-8').strip()
                 
-                # Vérification et envoi du signal
+                # Vérification du signal
                 if "BUY" in signal:
                     signal = "BUY"
+                    last_valid_signal = signal
+                    last_valid_id = e_id
+                    print(f"[✅] Signal BUY valide trouvé dans l'email {e_id}")
+                    break  # On a trouvé notre dernier signal valide
                 elif "SELL" in signal:
                     signal = "SELL"
+                    last_valid_signal = signal
+                    last_valid_id = e_id
+                    print(f"[✅] Signal SELL valide trouvé dans l'email {e_id}")
+                    break  # On a trouvé notre dernier signal valide
                 else:
-                    print(f"[❌] Signal invalide détecté")
-                    continue
+                    print(f"[❌] Pas de signal valide dans cet email")
 
-                print(f"[✅] Signal valide détecté : {signal}")
-                payload = {"side": signal}
-                
-                try:
-                    # Envoi au webhook
-                    response = requests.post(webhook_url, json=payload, headers=HEADERS)
-                    if response.status_code == 200:
-                        print(f"[🚀] Signal envoyé avec succès (code: {response.status_code})")
-                        # Marquer comme lu uniquement si l'envoi a réussi
-                        mail.store(e_id, "+FLAGS", "\\Seen")
-                        print("[✓] Email marqué comme lu")
-                    else:
-                        print(f"[❌] Erreur lors de l'envoi : code {response.status_code}")
-                        print(f"[📝] Réponse : {response.text}")
-                        # Ne pas marquer comme lu en cas d'erreur
-                except requests.exceptions.ConnectionError:
-                    print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
-                    print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
-                    continue
-                except Exception as e:
-                    print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
-                    continue
-
-            except imaplib.IMAP4.error as e:
-                print(f"[❌] Erreur IMAP lors du traitement de l'email {e_id}: {e}")
-                raise  # Propager l'erreur pour déclencher une reconnexion
             except Exception as e:
-                print(f"[❌] Erreur lors du traitement de l'email {e_id}: {e}")
+                print(f"[❌] Erreur lors de l'analyse de l'email {e_id}: {e}")
                 continue
+
+        # Marquer tous les autres emails comme lus
+        for e_id in email_ids:
+            if e_id != last_valid_id:
+                try:
+                    mail.store(e_id, "+FLAGS", "\\Seen")
+                    print(f"[✓] Email {e_id} marqué comme lu (ignoré)")
+                except Exception as e:
+                    print(f"[❌] Erreur lors du marquage de l'email {e_id}: {e}")
+
+        # Traiter uniquement le dernier signal valide si on en a trouvé un
+        if last_valid_signal and last_valid_id:
+            print(f"\n[🎯] Traitement du dernier signal valide : {last_valid_signal} (Email ID: {last_valid_id})")
+            payload = {"side": last_valid_signal}
+            
+            try:
+                # Envoi au webhook
+                response = requests.post(webhook_url, json=payload, headers=HEADERS)
+                if response.status_code == 200:
+                    print(f"[🚀] Signal envoyé avec succès (code: {response.status_code})")
+                    # Marquer comme lu uniquement si l'envoi a réussi
+                    mail.store(last_valid_id, "+FLAGS", "\\Seen")
+                    print("[✓] Email du signal traité marqué comme lu")
+                else:
+                    print(f"[❌] Erreur lors de l'envoi : code {response.status_code}")
+                    print(f"[📝] Réponse : {response.text}")
+            except requests.exceptions.ConnectionError:
+                print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
+                print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
+            except Exception as e:
+                print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
 
     except Exception as e:
         print(f"\n[❌] Erreur lors de la vérification des emails : {e}")
