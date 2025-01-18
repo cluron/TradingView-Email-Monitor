@@ -377,11 +377,12 @@ def display_banner():
 =================================================={Colors.ENDC}
 
 {Colors.BLUE}Ce script :{Colors.ENDC}
-• Surveille les emails provenant de TradingView
+• Se connecte à iCloud Mail via IMAP
+• Surveille les emails provenant de TradingView, qui applique la stratégie 'Future Trend Channel'
 • Détecte les signaux BUY/SELL dans les messages
-• Transmet les signaux au serveur de trading
-• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux par jour
-• Envoie une alerte si la limite est atteinte
+• Transmet les signaux au bot de trading pour qu'il puisse BUY/SELL
+• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux BUY/SELL envoyés par jour pour éviter les emballements
+• Envoie une alerte email si la limite est atteinte
 """
     print(banner)
 
