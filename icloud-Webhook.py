@@ -369,11 +369,24 @@ def check_email(mail, webhook_url):
         log_error(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
         raise
 
+def get_version():
+    """Récupère la version depuis le dernier tag Git"""
+    try:
+        import subprocess
+        result = subprocess.run(['git', 'describe', '--tags', '--abbrev=0'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return "version inconnue"
+    except Exception:
+        return "version inconnue"
+
 def display_banner():
     """Affiche le titre et la description du script"""
+    version = get_version()
     banner = f"""
 {Colors.BOLD}==================================================
-📧 TradingView Email Monitor v1.12.2
+📧 TradingView Email Monitor {version}
 =================================================={Colors.ENDC}
 
 {Colors.BLUE}Ce script :{Colors.ENDC}
