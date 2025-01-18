@@ -95,27 +95,76 @@ HEADERS = {
     "X-WEBHOOK-TOKEN": WEBHOOK_TOKEN
 }
 
-# Sécurité : compteur de transactions
-MAX_DAILY_TRANSACTIONS = 10
-transaction_count = 0
-last_transaction_date = datetime.now(timezone.utc).date()
+# Sécurité : compteur de signaux
+MAX_DAILY_SIGNALS = 10
+signal_count = 0
+last_signal_date = datetime.now(timezone.utc).date()
 
-def reset_transaction_counter():
-    global transaction_count, last_transaction_date
+def count_todays_signals(mail):
+    """Compte le nombre de signaux déjà envoyés aujourd'hui"""
+    global signal_count
+    today = datetime.now(timezone.utc).date()
+    today_str = today.strftime("%d-%b-%Y")  # Format: 24-Mar-2024
+    
+    # Recherche des emails de TradingView d'aujourd'hui
+    status, messages = mail.search(None, f'(FROM "noreply@tradingview.com" SENTON {today_str})')
+    if status != "OK" or not messages[0]:
+        return 0
+        
+    count = 0
+    for e_id in messages[0].split():
+        try:
+            status, msg_data = mail.fetch(e_id, '(BODY[])')
+            if not msg_data or not msg_data[0]:
+                continue
+
+            raw_email = None
+            for part in msg_data:
+                if isinstance(part, tuple) and len(part) > 1:
+                    raw_email = part[1]
+                    break
+
+            if not raw_email or not isinstance(raw_email, bytes):
+                continue
+
+            email_msg = email.message_from_bytes(raw_email)
+            
+            payload = None
+            if email_msg.is_multipart():
+                for part in email_msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        payload = part.get_payload(decode=True)
+                        break
+            else:
+                payload = email_msg.get_payload(decode=True)
+
+            if not payload:
+                continue
+
+            signal = payload.decode('utf-8').strip()
+            if "BUY" in signal or "SELL" in signal:
+                count += 1
+        except:
+            continue
+            
+    return count
+
+def reset_signal_counter():
+    global signal_count, last_signal_date
     current_date = datetime.now(timezone.utc).date()
-    if current_date != last_transaction_date:
-        if transaction_count > 0:
-            print(f"\n[📊] Réinitialisation du compteur de transactions (précédent : {transaction_count})")
-        transaction_count = 0
-        last_transaction_date = current_date
+    if current_date != last_signal_date:
+        if signal_count > 0:
+            print(f"\n[📊] Réinitialisation du compteur de signaux (précédent : {signal_count})")
+        signal_count = 0
+        last_signal_date = current_date
 
-def check_transaction_limit(signal):
-    global transaction_count
-    if transaction_count >= MAX_DAILY_TRANSACTIONS:
+def check_signal_limit(signal):
+    global signal_count
+    if signal_count >= MAX_DAILY_SIGNALS:
         if signal == "SELL":
-            print(f"\n[⚠️] Limite de {MAX_DAILY_TRANSACTIONS} transactions atteinte mais exécution du SELL final autorisée")
+            print(f"\n[⚠️] Limite de {MAX_DAILY_SIGNALS} signaux atteinte mais exécution du SELL final autorisée")
             return True
-        print(f"\n[🛑] Limite de {MAX_DAILY_TRANSACTIONS} transactions atteinte - Signal ignoré jusqu'à demain")
+        print(f"\n[🛑] Limite de {MAX_DAILY_SIGNALS} signaux atteinte - Signal ignoré jusqu'à demain")
         return False
     return True
 
@@ -125,10 +174,10 @@ def get_current_time():
 def check_email(mail, webhook_url):
     try:
         # Vérifier et réinitialiser le compteur si nécessaire
-        reset_transaction_counter()
+        reset_signal_counter()
         
-        # Nouvelle ligne avant la surveillance
-        print("\n\r[🔍] Surveillance active... ", end="", flush=True)
+        # Surveillance sur la même ligne
+        print("\r[🔍] Surveillance active... ", end="", flush=True)
         
         try:
             # Vérifier que la connexion est toujours active
@@ -226,7 +275,7 @@ def check_email(mail, webhook_url):
         # Traiter uniquement le dernier signal valide si on en a trouvé un
         if last_valid_signal and last_valid_id:
             # Vérifier la limite de transactions
-            if not check_transaction_limit(last_valid_signal):
+            if not check_signal_limit(last_valid_signal):
                 # Marquer l'email comme lu même si on ne le traite pas
                 try:
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
@@ -246,10 +295,10 @@ def check_email(mail, webhook_url):
                     # Marquer comme lu uniquement si l'envoi a réussi
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
                     print(f"[✓] {get_current_time()} Email du signal traité marqué comme lu")
-                    # Incrémenter le compteur de transactions
-                    global transaction_count
-                    transaction_count += 1
-                    print(f"\n[📊] Transactions aujourd'hui : {transaction_count}/{MAX_DAILY_TRANSACTIONS}")
+                    # Incrémenter le compteur de signaux
+                    global signal_count
+                    signal_count += 1
+                    print(f"\n[📊] Signaux traités aujourd'hui : {signal_count}/{MAX_DAILY_SIGNALS}")
                 else:
                     print(f"[❌] {get_current_time()} Erreur lors de l'envoi : code {response.status_code}")
                     print(f"[📝] {get_current_time()} Réponse : {response.text}")
@@ -269,7 +318,7 @@ def main():
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
     print(f"\n[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
-    print(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_TRANSACTIONS} transactions par jour")
+    print(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_SIGNALS} signaux par jour")
 
     reconnect_delay = 10  # Délai initial de reconnexion en secondes
     max_reconnect_delay = 300  # Délai maximum de 5 minutes
@@ -281,6 +330,12 @@ def main():
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
             mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
             mail.select("inbox")
+            
+            # Compter les signaux déjà envoyés aujourd'hui
+            global signal_count
+            signal_count = count_todays_signals(mail)
+            print(f"[📊] {get_current_time()} {signal_count} signaux déjà traités aujourd'hui")
+            
             print(f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView")
             
             # Réinitialiser le délai après une connexion réussie

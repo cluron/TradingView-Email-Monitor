@@ -268,13 +268,14 @@ tmux attach -t tradingview
 
 ## Mécanismes de sécurité
 
-### Limite de transactions quotidiennes
-Pour protéger contre les bugs potentiels ou les comportements erratiques des indicateurs, le script implémente une limite de transactions quotidiennes :
-- Maximum de 10 transactions par jour
+### Limite de signaux quotidiens
+Pour protéger contre les bugs potentiels ou les comportements erratiques des indicateurs, le script implémente une limite de signaux quotidiens :
+- Maximum de 10 signaux par jour
 - Le compteur se réinitialise à minuit (UTC)
+- Au démarrage, le script analyse les emails de la journée pour compter les signaux déjà traités
 - Si la limite est atteinte, le script :
   1. Exécute le dernier SELL si c'est un signal de vente
   2. Ignore tous les signaux suivants jusqu'à la réinitialisation du compteur
   3. Affiche un avertissement dans les logs
 
-Cette sécurité évite de potentielles pertes dues à des commissions excessives en cas de dysfonctionnement des indicateurs. 
+Cette sécurité évite les comportements erratiques en cas de dysfonctionnement des indicateurs tout en permettant de clôturer une position si nécessaire. 
