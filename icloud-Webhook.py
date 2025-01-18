@@ -372,8 +372,8 @@ def check_email(mail, webhook_url):
 def display_banner():
     """Affiche le titre et la description du script"""
     banner = f"""
-{Colors.HEADER}{Colors.BOLD}==================================================
-📧 TradingView Email Monitor v1.12.1
+{Colors.BOLD}==================================================
+📧 TradingView Email Monitor v1.12.2
 =================================================={Colors.ENDC}
 
 {Colors.BLUE}Ce script :{Colors.ENDC}
