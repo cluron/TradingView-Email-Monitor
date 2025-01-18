@@ -276,7 +276,14 @@ Pour protéger contre les bugs potentiels ou les comportements erratiques des in
 - Si la limite est atteinte, le script :
   1. Exécute le dernier SELL si c'est un signal de vente
   2. Ignore tous les signaux suivants jusqu'à la réinitialisation du compteur
-  3. Affiche un avertissement dans les logs
+  3. Envoie un email d'alerte à l'utilisateur
+  4. Affiche un avertissement dans les logs
+
+L'email d'alerte contient :
+- Le nombre de signaux atteint
+- Un rappel des points à vérifier
+- L'horodatage de l'événement
+- Des recommandations pour la suite
 
 Cette sécurité évite les comportements erratiques en cas de dysfonctionnement des indicateurs tout en permettant de clôturer une position si nécessaire.
 

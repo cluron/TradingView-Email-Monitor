@@ -20,6 +20,9 @@ import requests
 import time
 import argparse
 import sys
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from config import *
 from datetime import datetime, timezone
 
@@ -158,12 +161,54 @@ def reset_signal_counter():
         signal_count = 0
         last_signal_date = current_date
 
+def send_alert_email(subject, message):
+    """Envoie un email d'alerte via iCloud SMTP"""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_ACCOUNT
+        msg['To'] = EMAIL_ACCOUNT
+        msg['Subject'] = subject
+        
+        msg.attach(MIMEText(message, 'plain'))
+        
+        # Connexion au serveur SMTP d'iCloud
+        server = smtplib.SMTP_SSL('smtp.mail.me.com', 587)
+        server.login(EMAIL_ACCOUNT, APP_PASSWORD)
+        
+        # Envoi de l'email
+        server.send_message(msg)
+        server.quit()
+        print(f"[📧] {get_current_time()} Email d'alerte envoyé avec succès")
+        return True
+    except Exception as e:
+        print(f"[❌] {get_current_time()} Erreur lors de l'envoi de l'email d'alerte : {str(e)}")
+        return False
+
 def check_signal_limit(signal):
     global signal_count
     if signal_count >= MAX_DAILY_SIGNALS:
         if signal == "SELL":
             print(f"\n[⚠️] Limite de {MAX_DAILY_SIGNALS} signaux atteinte mais exécution du SELL final autorisée")
             return True
+            
+        # Envoyer un email d'alerte
+        subject = "⚠️ Alerte TradingView Monitor - Limite de signaux atteinte"
+        message = f"""
+Bonjour,
+
+Le moniteur TradingView a atteint sa limite de {MAX_DAILY_SIGNALS} signaux pour aujourd'hui.
+Le dernier signal reçu a été ignoré.
+
+Il est recommandé de vérifier :
+1. Le bon fonctionnement de vos indicateurs
+2. L'historique des signaux de la journée
+3. L'état de vos positions actuelles
+
+Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+Ce message est automatique, merci de ne pas y répondre.
+"""
+        send_alert_email(subject, message)
         print(f"\n[🛑] Limite de {MAX_DAILY_SIGNALS} signaux atteinte - Signal ignoré jusqu'à demain")
         return False
     return True
