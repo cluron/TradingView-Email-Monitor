@@ -98,6 +98,14 @@ def check_email(mail, webhook_url):
     try:
         # Utilisation de \r pour rester sur la même ligne et effacer le contenu précédent
         print("\r[🔍] Surveillance active... ", end="", flush=True)
+        
+        try:
+            # Vérifier que la connexion est toujours active
+            mail.noop()
+        except:
+            print("\n[🔄] La connexion semble inactive, déclenchement d'une reconnexion...")
+            raise imaplib.IMAP4.error("Connection check failed")
+
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
 
         if status != "OK" or not messages[0]:
@@ -106,77 +114,90 @@ def check_email(mail, webhook_url):
             return
 
         for e_id in messages[0].split():
-            # Nouvelle ligne uniquement quand on a un email à traiter
-            print(f"\n[📧] Traitement de l'email ID : {e_id}")
-            
-            # Récupération du message avec BODY[] au lieu de RFC822
-            status, msg_data = mail.fetch(e_id, '(BODY[])')
-            
-            # Vérification détaillée du format
-            if not msg_data or not msg_data[0]:
-                print("[❌] msg_data est vide ou invalide")
-                continue
-
-            # Extraction du contenu brut de l'email
-            raw_email = None
-            for part in msg_data:
-                if isinstance(part, tuple) and len(part) > 1:
-                    raw_email = part[1]
-                    break
-
-            if not raw_email or not isinstance(raw_email, bytes):
-                print(f"[❌] Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
-                continue
-
-            email_msg = email.message_from_bytes(raw_email)
-            
-            # Extraction du signal (corps du message)
-            payload = None
-            if email_msg.is_multipart():
-                for part in email_msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        payload = part.get_payload(decode=True)
-                        break
-            else:
-                payload = email_msg.get_payload(decode=True)
-
-            if not payload:
-                print("[❌] Aucun contenu text/plain trouvé dans l'email")
-                continue
-
-            signal = payload.decode('utf-8').strip()
-            
-            # Vérification et envoi du signal
-            if "BUY" in signal:
-                signal = "BUY"
-            elif "SELL" in signal:
-                signal = "SELL"
-            else:
-                print(f"[❌] Signal invalide détecté")
-                continue
-
-            print(f"[✅] Signal valide détecté : {signal}")
-            payload = {"side": signal}
-            
             try:
-                # Envoi au webhook
-                response = requests.post(webhook_url, json=payload, headers=HEADERS)
-                print(f"[🚀] Signal envoyé, réponse : {response.status_code}")
-            except requests.exceptions.ConnectionError:
-                print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
-                print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
-                continue
+                # Nouvelle ligne uniquement quand on a un email à traiter
+                print(f"\n[📧] Traitement de l'email ID : {e_id}")
+                
+                # Récupération du message avec BODY[] au lieu de RFC822
+                status, msg_data = mail.fetch(e_id, '(BODY[])')
+                
+                # Vérification détaillée du format
+                if not msg_data or not msg_data[0]:
+                    print("[❌] msg_data est vide ou invalide")
+                    continue
+
+                # Extraction du contenu brut de l'email
+                raw_email = None
+                for part in msg_data:
+                    if isinstance(part, tuple) and len(part) > 1:
+                        raw_email = part[1]
+                        break
+
+                if not raw_email or not isinstance(raw_email, bytes):
+                    print(f"[❌] Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
+                    continue
+
+                email_msg = email.message_from_bytes(raw_email)
+                
+                # Extraction du signal (corps du message)
+                payload = None
+                if email_msg.is_multipart():
+                    for part in email_msg.walk():
+                        if part.get_content_type() == "text/plain":
+                            payload = part.get_payload(decode=True)
+                            break
+                else:
+                    payload = email_msg.get_payload(decode=True)
+
+                if not payload:
+                    print("[❌] Aucun contenu text/plain trouvé dans l'email")
+                    continue
+
+                signal = payload.decode('utf-8').strip()
+                
+                # Vérification et envoi du signal
+                if "BUY" in signal:
+                    signal = "BUY"
+                elif "SELL" in signal:
+                    signal = "SELL"
+                else:
+                    print(f"[❌] Signal invalide détecté")
+                    continue
+
+                print(f"[✅] Signal valide détecté : {signal}")
+                payload = {"side": signal}
+                
+                try:
+                    # Envoi au webhook
+                    response = requests.post(webhook_url, json=payload, headers=HEADERS)
+                    if response.status_code == 200:
+                        print(f"[🚀] Signal envoyé avec succès (code: {response.status_code})")
+                        # Marquer comme lu uniquement si l'envoi a réussi
+                        mail.store(e_id, "+FLAGS", "\\Seen")
+                        print("[✓] Email marqué comme lu")
+                    else:
+                        print(f"[❌] Erreur lors de l'envoi : code {response.status_code}")
+                        print(f"[📝] Réponse : {response.text}")
+                        # Ne pas marquer comme lu en cas d'erreur
+                except requests.exceptions.ConnectionError:
+                    print(f"[❌] Impossible de se connecter au serveur webhook : {webhook_url}")
+                    print("[💡] Vérifiez que le serveur est bien en ligne et accessible")
+                    continue
+                except Exception as e:
+                    print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
+                    continue
+
+            except imaplib.IMAP4.error as e:
+                print(f"[❌] Erreur IMAP lors du traitement de l'email {e_id}: {e}")
+                raise  # Propager l'erreur pour déclencher une reconnexion
             except Exception as e:
-                print(f"[❌] Erreur lors de l'envoi au webhook : {str(e)}")
+                print(f"[❌] Erreur lors du traitement de l'email {e_id}: {e}")
                 continue
-            
-            # Marquer comme lu
-            mail.store(e_id, "+FLAGS", "\\Seen")
-            print("[✓] Email marqué comme lu")
 
     except Exception as e:
         print(f"\n[❌] Erreur lors de la vérification des emails : {e}")
         print(f"[📝] Détails de l'erreur : {str(e)}")
+        raise  # Propager l'erreur pour déclencher une reconnexion
 
 def main():
     # Parse les arguments
@@ -184,38 +205,50 @@ def main():
     webhook_url = get_webhook_url(args.mode)
     print(f"[⚙️] Mode du serveur webhook : {args.mode} ({webhook_url})")
 
-    try:
-        while True:
-            try:
-                print("\n[🔌] Connexion à iCloud...")
-                mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-                mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
-                mail.select("inbox")
-                print("[✅] Connecté et prêt à surveiller les emails de TradingView")
+    reconnect_delay = 10  # Délai initial de reconnexion en secondes
+    max_reconnect_delay = 300  # Délai maximum de 5 minutes
 
-                while True:
-                    check_email(mail, webhook_url)
-                    time.sleep(10)
-
-            except imaplib.IMAP4.error as e:
-                print(f"[❌] Erreur IMAP : {e}")
-                print("[🔄] Reconnexion dans 30 secondes...")
-                time.sleep(30)
-            except Exception as e:
-                print(f"[❌] Erreur : {e}")
-                print("[🔄] Reconnexion dans 30 secondes...")
-                time.sleep(30)
-
-    except KeyboardInterrupt:
-        print("\n[👋] Arrêt du programme...")
+    while True:
+        mail = None
         try:
-            mail.close()
-            mail.logout()
-            print("[✅] Déconnexion effectuée")
-        except:
-            pass
-        print("[✅] Programme arrêté")
-        sys.exit(0)
+            print("\n[🔌] Connexion à iCloud...")
+            mail = imaplib.IMAP4_SSL(IMAP_SERVER)
+            mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
+            mail.select("inbox")
+            print("[✅] Connecté et prêt à surveiller les emails de TradingView")
+            
+            # Réinitialiser le délai après une connexion réussie
+            reconnect_delay = 10
+
+            while True:
+                check_email(mail, webhook_url)
+                time.sleep(10)
+
+        except KeyboardInterrupt:
+            print("\n[👋] Arrêt du programme...")
+            try:
+                if mail:
+                    mail.close()
+                    mail.logout()
+                print("[✅] Déconnexion effectuée")
+            except:
+                pass
+            print("[✅] Programme arrêté")
+            sys.exit(0)
+
+        except Exception as e:
+            print(f"[❌] Erreur de connexion : {str(e)}")
+            try:
+                if mail:
+                    mail.logout()
+            except:
+                pass
+
+            print(f"[🔄] Nouvelle tentative dans {reconnect_delay} secondes...")
+            time.sleep(reconnect_delay)
+            
+            # Augmenter le délai de reconnexion de manière exponentielle
+            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
 if __name__ == "__main__":
     main()
