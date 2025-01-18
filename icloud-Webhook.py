@@ -25,6 +25,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from config import *
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo  # Ajout de l'import pour les fuseaux horaires
 
 # Couleurs pour le terminal
 class Colors:
@@ -106,7 +107,7 @@ last_signal_date = datetime.now(timezone.utc).date()
 def count_todays_signals(mail):
     """Compte le nombre de signaux déjà envoyés aujourd'hui"""
     global signal_count
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(ZoneInfo("Europe/Paris")).date()
     today_str = today.strftime("%d-%b-%Y")  # Format: 24-Mar-2024
     
     # Recherche des emails de TradingView d'aujourd'hui
@@ -154,7 +155,7 @@ def count_todays_signals(mail):
 
 def reset_signal_counter():
     global signal_count, last_signal_date
-    current_date = datetime.now(timezone.utc).date()
+    current_date = datetime.now(ZoneInfo("Europe/Paris")).date()
     if current_date != last_signal_date:
         if signal_count > 0:
             log_success(f"\n[📊] Réinitialisation du compteur de signaux quotidiens")
@@ -190,7 +191,7 @@ def check_signal_limit(signal):
     global signal_count
     if signal_count >= MAX_DAILY_SIGNALS:
         if signal == "SELL":
-            print(f"\n[⚠️] Limite de {MAX_DAILY_SIGNALS} signaux atteinte mais exécution du SELL final autorisée")
+            log_warning(f"\n[⚠️] Limite de {MAX_DAILY_SIGNALS} signaux atteinte mais exécution du SELL final autorisée")
             return True
             
         # Envoyer un email d'alerte
@@ -206,17 +207,17 @@ Il est recommandé de vérifier :
 2. L'historique des signaux de la journée
 3. L'état de vos positions actuelles
 
-Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+Timestamp: {datetime.now(ZoneInfo("Europe/Paris")).strftime('%Y-%m-%d %H:%M:%S (Europe/Paris)')}
 
 Ce message est automatique, merci de ne pas y répondre.
 """
         send_alert_email(subject, message)
-        print(f"\n[🛑] Limite de {MAX_DAILY_SIGNALS} signaux atteinte - Signal ignoré jusqu'à demain")
+        log_error(f"\n[🛑] Limite de {MAX_DAILY_SIGNALS} signaux atteinte - Signal ignoré jusqu'à demain")
         return False
     return True
 
 def get_current_time():
-    return datetime.now().strftime("%H:%M:%S")
+    return datetime.now(ZoneInfo("Europe/Paris")).strftime("%H:%M:%S")
 
 def format_email_id(email_id):
     """Formate l'ID de l'email pour un meilleur affichage"""
