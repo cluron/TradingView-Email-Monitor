@@ -28,14 +28,14 @@ from datetime import datetime, timezone
 
 # Couleurs pour le terminal
 class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+    HEADER = '\033[95m'  # Violet
+    BLUE = '\033[94m'    # Bleu
+    GREEN = '\033[92m'   # Vert
+    YELLOW = '\033[93m'  # Jaune
+    RED = '\033[91m'     # Rouge
+    ENDC = '\033[0m'     # Reset
+    BOLD = '\033[1m'     # Gras
+    UNDERLINE = '\033[4m'# Souligné
 
 def parse_arguments():
     # Création d'un formateur personnalisé pour l'aide
@@ -216,47 +216,63 @@ Ce message est automatique, merci de ne pas y répondre.
 def get_current_time():
     return datetime.now().strftime("%H:%M:%S")
 
+def format_email_id(email_id):
+    """Formate l'ID de l'email pour un meilleur affichage"""
+    return f"#{str(int(email_id))}"
+
+def log_info(message, end="\n"):
+    print(f"{Colors.BLUE}{message}{Colors.ENDC}", end=end, flush=True)
+
+def log_success(message, end="\n"):
+    print(f"{Colors.GREEN}{message}{Colors.ENDC}", end=end, flush=True)
+
+def log_warning(message, end="\n"):
+    print(f"{Colors.YELLOW}{message}{Colors.ENDC}", end=end, flush=True)
+
+def log_error(message, end="\n"):
+    print(f"{Colors.RED}{message}{Colors.ENDC}", end=end, flush=True)
+
+def log_header(message, end="\n"):
+    print(f"{Colors.HEADER}{message}{Colors.ENDC}", end=end, flush=True)
+
 def check_email(mail, webhook_url):
     try:
         # Vérifier et réinitialiser le compteur si nécessaire
         reset_signal_counter()
         
-        # Surveillance sur la même ligne avec message d'aide
-        print("\r[🔍] Surveillance active... (CTRL+C pour arrêter) ", end="", flush=True)
+        # Surveillance sur la même ligne
+        log_info("\r[🔍] Surveillance active... (CTRL+C pour arrêter) ", end="")
         
         try:
-            # Vérifier que la connexion est toujours active
             mail.noop()
         except:
-            print(f"\n[🔄] {get_current_time()} La connexion semble inactive, déclenchement d'une reconnexion...")
+            log_warning(f"\n[🔄] {get_current_time()} La connexion semble inactive, déclenchement d'une reconnexion...")
             raise imaplib.IMAP4.error("Connection check failed")
 
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
 
         if status != "OK" or not messages[0]:
-            # Ajoute un point pour montrer que le script est actif
             print(".", end="", flush=True)
             return
 
         # Récupérer tous les IDs d'emails non lus
         email_ids = messages[0].split()
         if len(email_ids) > 1:
-            print(f"\n[⚠️] {get_current_time()} Attention: {len(email_ids)} emails non lus détectés")
+            log_warning(f"\n\n[⚠️] {get_current_time()} Attention: {len(email_ids)} emails non lus détectés")
 
         # On va d'abord identifier le dernier email avec un signal valide
         last_valid_signal = None
         last_valid_id = None
         
-        # Parcourir les emails dans l'ordre inverse (du plus récent au plus ancien)
+        # Parcourir les emails dans l'ordre inverse
         for e_id in reversed(email_ids):
             try:
-                print(f"\n[📧] {get_current_time()} Analyse de l'email ID : {e_id}")
+                log_info(f"\n[📧] {get_current_time()} Analyse de l'email {format_email_id(e_id)}")
                 
-                # Récupération du message
                 status, msg_data = mail.fetch(e_id, '(BODY[])')
                 
                 if not msg_data or not msg_data[0]:
-                    print(f"[❌] {get_current_time()} msg_data est vide ou invalide")
+                    log_error(f"[❌] {get_current_time()} msg_data est vide ou invalide")
                     continue
 
                 # Extraction du contenu brut de l'email
@@ -267,7 +283,7 @@ def check_email(mail, webhook_url):
                         break
 
                 if not raw_email or not isinstance(raw_email, bytes):
-                    print(f"[❌] {get_current_time()} Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
+                    log_error(f"[❌] {get_current_time()} Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
                     continue
 
                 email_msg = email.message_from_bytes(raw_email)
@@ -283,7 +299,7 @@ def check_email(mail, webhook_url):
                     payload = email_msg.get_payload(decode=True)
 
                 if not payload:
-                    print(f"[❌] {get_current_time()} Aucun contenu text/plain trouvé dans l'email")
+                    log_error(f"[❌] {get_current_time()} Aucun contenu text/plain trouvé dans l'email")
                     continue
 
                 signal = payload.decode('utf-8').strip()
@@ -293,97 +309,89 @@ def check_email(mail, webhook_url):
                     signal = "BUY"
                     last_valid_signal = signal
                     last_valid_id = e_id
-                    print(f"[✅] {get_current_time()} Signal BUY valide trouvé dans l'email {e_id}")
-                    break  # On a trouvé notre dernier signal valide
+                    log_success(f"[✅] {get_current_time()} Signal {Colors.BOLD}BUY{Colors.ENDC}{Colors.GREEN} valide trouvé dans l'email {format_email_id(e_id)}")
+                    break
                 elif "SELL" in signal:
                     signal = "SELL"
                     last_valid_signal = signal
                     last_valid_id = e_id
-                    print(f"[✅] {get_current_time()} Signal SELL valide trouvé dans l'email {e_id}")
-                    break  # On a trouvé notre dernier signal valide
+                    log_success(f"[✅] {get_current_time()} Signal {Colors.BOLD}SELL{Colors.ENDC}{Colors.GREEN} valide trouvé dans l'email {format_email_id(e_id)}")
+                    break
                 else:
-                    print(f"[❌] {get_current_time()} Pas de signal valide dans cet email")
+                    log_error(f"[❌] {get_current_time()} Pas de signal valide dans cet email")
 
             except Exception as e:
-                print(f"[❌] {get_current_time()} Erreur lors de l'analyse de l'email {e_id}: {e}")
+                log_error(f"[❌] {get_current_time()} Erreur lors de l'analyse de l'email {format_email_id(e_id)}: {e}")
                 continue
 
-        # Marquer tous les autres emails comme lus
+        # Marquer les autres emails comme lus
         for e_id in email_ids:
             if e_id != last_valid_id:
                 try:
                     mail.store(e_id, "+FLAGS", "\\Seen")
-                    print(f"[✓] {get_current_time()} Email {e_id} marqué comme lu (ignoré)")
+                    log_success(f"[✓] {get_current_time()} Email {format_email_id(e_id)} marqué comme lu (ignoré)")
                 except Exception as e:
-                    print(f"[❌] {get_current_time()} Erreur lors du marquage de l'email {e_id}: {e}")
+                    log_error(f"[❌] {get_current_time()} Erreur lors du marquage de l'email {format_email_id(e_id)}: {e}")
 
-        # Traiter uniquement le dernier signal valide si on en a trouvé un
+        # Traiter le dernier signal valide
         if last_valid_signal and last_valid_id:
-            # Vérifier la limite de transactions
             if not check_signal_limit(last_valid_signal):
-                # Marquer l'email comme lu même si on ne le traite pas
                 try:
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
-                    print(f"[✓] {get_current_time()} Email marqué comme lu (limite de transactions atteinte)")
+                    log_success(f"[✓] {get_current_time()} Email marqué comme lu (limite de signaux atteinte)")
                 except Exception as e:
-                    print(f"[❌] {get_current_time()} Erreur lors du marquage de l'email : {e}")
+                    log_error(f"[❌] {get_current_time()} Erreur lors du marquage de l'email : {e}")
                 return
 
-            print(f"\n[🎯] {get_current_time()} Traitement du dernier signal valide : {last_valid_signal} (Email ID: {last_valid_id})")
+            log_header(f"\n[🎯] {get_current_time()} Traitement du signal {Colors.BOLD}{last_valid_signal}{Colors.ENDC}{Colors.HEADER} (Email {format_email_id(last_valid_id)})")
             payload = {"side": last_valid_signal}
             
             try:
-                # Envoi au webhook
                 response = requests.post(webhook_url, json=payload, headers=HEADERS)
                 if response.status_code == 200:
-                    print(f"[🚀] {get_current_time()} Signal envoyé avec succès (code: {response.status_code})")
-                    # Marquer comme lu uniquement si l'envoi a réussi
+                    log_success(f"[🚀] {get_current_time()} Signal envoyé avec succès (code: {response.status_code})")
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
-                    print(f"[✓] {get_current_time()} Email du signal traité marqué comme lu")
-                    # Incrémenter le compteur de signaux
+                    log_success(f"[✓] {get_current_time()} Email du signal traité marqué comme lu")
                     global signal_count
                     signal_count += 1
-                    print(f"\n[📊] Signaux traités aujourd'hui : {signal_count}/{MAX_DAILY_SIGNALS}")
+                    log_info(f"\n[📊] Signaux traités aujourd'hui : {signal_count}/{MAX_DAILY_SIGNALS}")
                 else:
-                    print(f"[❌] {get_current_time()} Erreur lors de l'envoi : code {response.status_code}")
-                    print(f"[📝] {get_current_time()} Réponse : {response.text}")
+                    log_error(f"[❌] {get_current_time()} Erreur lors de l'envoi : code {response.status_code}")
+                    log_error(f"[📝] {get_current_time()} Réponse : {response.text}")
             except requests.exceptions.ConnectionError:
-                print(f"[❌] {get_current_time()} Impossible de se connecter au serveur webhook : {webhook_url}")
-                print(f"[💡] {get_current_time()} Vérifiez que le serveur est bien en ligne et accessible")
+                log_error(f"[❌] {get_current_time()} Impossible de se connecter au serveur webhook : {webhook_url}")
+                log_warning(f"[💡] {get_current_time()} Vérifiez que le serveur est bien en ligne et accessible")
             except Exception as e:
-                print(f"[❌] {get_current_time()} Erreur lors de l'envoi au webhook : {str(e)}")
+                log_error(f"[❌] {get_current_time()} Erreur lors de l'envoi au webhook : {str(e)}")
 
     except Exception as e:
-        print(f"\n[❌] {get_current_time()} Erreur lors de la vérification des emails : {e}")
-        print(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
-        raise  # Propager l'erreur pour déclencher une reconnexion
+        log_error(f"\n[❌] {get_current_time()} Erreur lors de la vérification des emails : {e}")
+        log_error(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
+        raise
 
 def main():
-    # Parse les arguments
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
-    print(f"\n[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
-    print(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_SIGNALS} signaux par jour")
+    log_header(f"\n[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
+    log_header(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_SIGNALS} signaux par jour")
 
-    reconnect_delay = 10  # Délai initial de reconnexion en secondes
-    max_reconnect_delay = 300  # Délai maximum de 5 minutes
+    reconnect_delay = 10
+    max_reconnect_delay = 300
 
     while True:
         mail = None
         try:
-            print(f"\n[🔌] {get_current_time()} Connexion à iCloud...")
+            log_info(f"\n[🔌] {get_current_time()} Connexion à iCloud...")
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
             mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
             mail.select("inbox")
             
-            # Compter les signaux déjà envoyés aujourd'hui
             global signal_count
             signal_count = count_todays_signals(mail)
-            print(f"[📊] {get_current_time()} {signal_count} signaux déjà traités aujourd'hui")
+            log_info(f"[📊] {get_current_time()} {signal_count} signaux déjà traités aujourd'hui")
             
-            print(f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView")
+            log_success(f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView\n")
             
-            # Réinitialiser le délai après une connexion réussie
             reconnect_delay = 10
 
             while True:
@@ -391,29 +399,27 @@ def main():
                 time.sleep(10)
 
         except KeyboardInterrupt:
-            print("\n[👋] Arrêt du programme...")
+            log_warning("\n\n[👋] Arrêt du programme...")
             try:
                 if mail:
                     mail.close()
                     mail.logout()
-                print("[✅] Déconnexion effectuée")
+                log_success("[✅] Déconnexion effectuée")
             except:
                 pass
-            print("[✅] Programme arrêté")
+            log_success("[✅] Programme arrêté")
             sys.exit(0)
 
         except Exception as e:
-            print(f"[❌] {get_current_time()} Erreur de connexion : {str(e)}")
+            log_error(f"[❌] {get_current_time()} Erreur de connexion : {str(e)}")
             try:
                 if mail:
                     mail.logout()
             except:
                 pass
 
-            print(f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes...")
+            log_warning(f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes...")
             time.sleep(reconnect_delay)
-            
-            # Augmenter le délai de reconnexion de manière exponentielle
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
 if __name__ == "__main__":
