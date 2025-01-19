@@ -107,13 +107,19 @@ signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
 # Historique des messages
-MAX_MESSAGE_HISTORY = 5  # Nombre de messages à conserver
+MAX_MESSAGE_HISTORY = 10  # Nombre de messages à conserver
 message_history = []
 
+def get_current_datetime():
+    """Retourne la date et l'heure au format JJ/MM/YYYY HH:MM:SS"""
+    return datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y %H:%M:%S")
+
 def add_to_history(message):
-    """Ajoute un message à l'historique"""
+    """Ajoute un message à l'historique avec la date et l'heure"""
     global message_history
-    message_history.append(message)
+    # Ajouter la date et l'heure au début du message
+    message_with_date = f"[{get_current_datetime()}] {message}"
+    message_history.append(message_with_date)
     if len(message_history) > MAX_MESSAGE_HISTORY:
         message_history.pop(0)
 
