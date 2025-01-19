@@ -106,6 +106,17 @@ MAX_DAILY_SIGNALS = 15
 signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
+# Historique des messages
+MAX_MESSAGE_HISTORY = 5  # Nombre de messages à conserver
+message_history = []
+
+def add_to_history(message):
+    """Ajoute un message à l'historique"""
+    global message_history
+    message_history.append(message)
+    if len(message_history) > MAX_MESSAGE_HISTORY:
+        message_history.pop(0)
+
 def count_todays_signals(mail):
     """Compte le nombre de signaux déjà envoyés aujourd'hui"""
     global signal_count
@@ -284,11 +295,18 @@ def display_stats(signal_count, last_signal=None):
         print("Dernier signal     : Aucun\n")
 
 def display_last_event(message):
-    """Affiche le dernier événement"""
+    """Affiche le dernier événement et son historique"""
     width = get_terminal_width()
-    print("DERNIER ÉVÉNEMENT")
-    print("═" * 16)
-    print(message + "\n")
+    print("DERNIERS ÉVÉNEMENTS")
+    print("═" * 18)
+    
+    if message:
+        add_to_history(message)
+    
+    # Afficher l'historique du plus récent au plus ancien
+    for msg in reversed(message_history):
+        print(msg)
+    print()
 
 def display_error_zone(error_message=None):
     """Affiche la zone d'erreurs"""
