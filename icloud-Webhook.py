@@ -341,7 +341,8 @@ def check_email(mail, webhook_url, mode):
         # Récupérer tous les IDs d'emails non lus
         email_ids = messages[0].split()
         if len(email_ids) > 1:
-            log_warning(f"\n\n[⚠️] {get_current_time()} Attention: {len(email_ids)} emails non lus détectés")
+            update_display(mode, webhook_url, signal_count, 
+                         last_event=f"[⚠️] {get_current_time()} Attention: {len(email_ids)} emails non lus détectés")
 
         # On va d'abord identifier le dernier email avec un signal valide
         last_valid_signal = None
@@ -350,12 +351,14 @@ def check_email(mail, webhook_url, mode):
         # Parcourir les emails dans l'ordre inverse
         for e_id in reversed(email_ids):
             try:
-                log_info(f"\n[📧] {get_current_time()} Analyse de l'email {format_email_id(e_id)}")
+                update_display(mode, webhook_url, signal_count, 
+                             last_event=f"[📧] {get_current_time()} Analyse de l'email {format_email_id(e_id)}")
                 
                 status, msg_data = mail.fetch(e_id, '(BODY[])')
                 
                 if not msg_data or not msg_data[0]:
-                    log_error(f"[❌] {get_current_time()} msg_data est vide ou invalide")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} msg_data est vide ou invalide")
                     continue
 
                 # Extraction du contenu brut de l'email
@@ -366,7 +369,8 @@ def check_email(mail, webhook_url, mode):
                         break
 
                 if not raw_email or not isinstance(raw_email, bytes):
-                    log_error(f"[❌] {get_current_time()} Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Format invalide : raw_email est de type {type(raw_email)} (attendu: bytes)")
                     continue
 
                 email_msg = email.message_from_bytes(raw_email)
@@ -382,7 +386,8 @@ def check_email(mail, webhook_url, mode):
                     payload = email_msg.get_payload(decode=True)
 
                 if not payload:
-                    log_error(f"[❌] {get_current_time()} Aucun contenu text/plain trouvé dans l'email")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Aucun contenu text/plain trouvé dans l'email")
                     continue
 
                 signal = payload.decode('utf-8').strip()
@@ -392,19 +397,23 @@ def check_email(mail, webhook_url, mode):
                     signal = "BUY"
                     last_valid_signal = signal
                     last_valid_id = e_id
-                    log_success(f"[✅] {get_current_time()} Signal {Colors.BOLD}BUY{Colors.ENDC}{Colors.GREEN} valide trouvé dans l'email {format_email_id(e_id)}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 last_event=f"[✅] {get_current_time()} Signal {Colors.BOLD}BUY{Colors.ENDC} valide trouvé dans l'email {format_email_id(e_id)}")
                     break
                 elif "SELL" in signal:
                     signal = "SELL"
                     last_valid_signal = signal
                     last_valid_id = e_id
-                    log_success(f"[✅] {get_current_time()} Signal {Colors.BOLD}SELL{Colors.ENDC}{Colors.GREEN} valide trouvé dans l'email {format_email_id(e_id)}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 last_event=f"[✅] {get_current_time()} Signal {Colors.BOLD}SELL{Colors.ENDC} valide trouvé dans l'email {format_email_id(e_id)}")
                     break
                 else:
-                    log_error(f"[❌] {get_current_time()} Pas de signal valide dans cet email")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Pas de signal valide dans cet email")
 
             except Exception as e:
-                log_error(f"[❌] {get_current_time()} Erreur lors de l'analyse de l'email {format_email_id(e_id)}: {e}")
+                update_display(mode, webhook_url, signal_count, 
+                             error=f"[❌] {get_current_time()} Erreur lors de l'analyse de l'email {format_email_id(e_id)}: {e}")
                 continue
 
         # Marquer les autres emails comme lus
@@ -412,44 +421,50 @@ def check_email(mail, webhook_url, mode):
             if e_id != last_valid_id:
                 try:
                     mail.store(e_id, "+FLAGS", "\\Seen")
-                    log_success(f"[✓] {get_current_time()} Email {format_email_id(e_id)} marqué comme lu (ignoré)")
+                    update_display(mode, webhook_url, signal_count, 
+                                 last_event=f"[✓] {get_current_time()} Email {format_email_id(e_id)} marqué comme lu (ignoré)")
                 except Exception as e:
-                    log_error(f"[❌] {get_current_time()} Erreur lors du marquage de l'email {format_email_id(e_id)}: {e}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Erreur lors du marquage de l'email {format_email_id(e_id)}: {e}")
 
         # Traiter le dernier signal valide
         if last_valid_signal and last_valid_id:
             if not check_signal_limit(last_valid_signal):
                 try:
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
-                    log_success(f"[✓] {get_current_time()} Email marqué comme lu (limite de signaux atteinte)")
+                    update_display(mode, webhook_url, signal_count, 
+                                 last_event=f"[✓] {get_current_time()} Email marqué comme lu (limite de signaux atteinte)")
                 except Exception as e:
-                    log_error(f"[❌] {get_current_time()} Erreur lors du marquage de l'email : {e}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Erreur lors du marquage de l'email : {e}")
                 return
 
-            log_header(f"\n[🎯] {get_current_time()} Traitement du signal {Colors.BOLD}{last_valid_signal}{Colors.ENDC}{Colors.HEADER} (Email {format_email_id(last_valid_id)})")
+            update_display(mode, webhook_url, signal_count, 
+                         last_event=f"[🎯] {get_current_time()} Traitement du signal {Colors.BOLD}{last_valid_signal}{Colors.ENDC}")
             payload = {"side": last_valid_signal}
             
             try:
                 response = requests.post(webhook_url, json=payload, headers=HEADERS)
                 if response.status_code == 200:
-                    log_success(f"[🚀] {get_current_time()} Signal envoyé avec succès (code: {response.status_code})")
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
-                    log_success(f"[✓] {get_current_time()} Email du signal traité marqué comme lu")
                     global signal_count
                     signal_count += 1
-                    log_info(f"\n[📊] Signaux traités aujourd'hui : {signal_count}/{MAX_DAILY_SIGNALS}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 last_signal=f"{last_valid_signal} à {get_current_time()}",
+                                 last_event=f"[🚀] {get_current_time()} Signal {last_valid_signal} envoyé avec succès")
                 else:
-                    log_error(f"[❌] {get_current_time()} Erreur lors de l'envoi : code {response.status_code}")
-                    log_error(f"[📝] {get_current_time()} Réponse : {response.text}")
+                    update_display(mode, webhook_url, signal_count, 
+                                 error=f"[❌] {get_current_time()} Erreur lors de l'envoi : code {response.status_code}\n[📝] Réponse : {response.text}")
             except requests.exceptions.ConnectionError:
-                log_error(f"[❌] {get_current_time()} Impossible de se connecter au serveur webhook : {webhook_url}")
-                log_warning(f"[💡] {get_current_time()} Vérifiez que le serveur est bien en ligne et accessible")
+                update_display(mode, webhook_url, signal_count, 
+                             error=f"[❌] {get_current_time()} Impossible de se connecter au serveur webhook : {webhook_url}\n[💡] Vérifiez que le serveur est bien en ligne et accessible")
             except Exception as e:
-                log_error(f"[❌] {get_current_time()} Erreur lors de l'envoi au webhook : {str(e)}")
+                update_display(mode, webhook_url, signal_count, 
+                             error=f"[❌] {get_current_time()} Erreur lors de l'envoi au webhook : {str(e)}")
 
     except Exception as e:
-        log_error(f"\n[❌] {get_current_time()} Erreur lors de la vérification des emails : {e}")
-        log_error(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
+        update_display(mode, webhook_url, signal_count, 
+                      error=f"[❌] {get_current_time()} Erreur lors de la vérification des emails : {e}\n[📝] Détails : {str(e)}")
         raise
 
 def main():
