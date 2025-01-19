@@ -322,6 +322,7 @@ def get_version():
         return "version inconnue"
 
 def check_email(mail, webhook_url, mode):
+    global signal_count
     try:
         # Vérifier et réinitialiser le compteur si nécessaire
         reset_signal_counter()
@@ -447,7 +448,6 @@ def check_email(mail, webhook_url, mode):
                 response = requests.post(webhook_url, json=payload, headers=HEADERS)
                 if response.status_code == 200:
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
-                    global signal_count
                     signal_count += 1
                     update_display(mode, webhook_url, signal_count, 
                                  last_signal=f"{last_valid_signal} à {get_current_time()}",
