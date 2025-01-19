@@ -26,6 +26,8 @@ from email.mime.multipart import MIMEMultipart
 from config import *
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo  # Ajout de l'import pour les fuseaux horaires
+import os
+import shutil
 
 # Couleurs pour le terminal
 class Colors:
@@ -238,24 +240,102 @@ def log_error(message, end="\n"):
 def log_header(message, end="\n"):
     print(f"{Colors.HEADER}{message}{Colors.ENDC}", end=end, flush=True)
 
-def check_email(mail, webhook_url):
+def clear_screen():
+    """Efface l'écran du terminal"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def get_terminal_width():
+    """Récupère la largeur du terminal"""
+    return shutil.get_terminal_size().columns
+
+def display_banner():
+    """Affiche le titre et la description du script"""
+    version = get_version()
+    width = get_terminal_width()
+    separator = "═" * width
+
+    clear_screen()
+    print(f"\n{separator}")
+    print(f"📧 TradingView Email Monitor {version}".center(width))
+    print(f"{separator}\n")
+
+    print(f"{Colors.BLUE}Ce script :{Colors.ENDC}")
+    print("• Se connecte à iCloud Mail via IMAP")
+    print("• Surveille les emails provenant de TradingView, qui applique la stratégie 'Future Trend Channel'")
+    print("• Détecte les signaux BUY/SELL dans les messages")
+    print("• Transmet les signaux au bot de trading pour qu'il puisse BUY/SELL")
+    print(f"• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux BUY/SELL envoyés par jour pour éviter les emballements")
+    print("• Envoie une alerte email si la limite est atteinte\n")
+
+def display_status(mode, webhook_url):
+    """Affiche l'état du service"""
+    print(f"🔵 Mode {mode.upper()} activé (envoi des alertes de trading vers un serveur {mode.lower()})")
+    print(f"✅ Connexion IMAP établie et vérifiée\n")
+
+def display_stats(signal_count, last_signal=None):
+    """Affiche les statistiques"""
+    width = get_terminal_width()
+    print("STATISTIQUES JOURNALIÈRES")
+    print("═" * 24)
+    print(f"Signaux traités    : {signal_count}/{MAX_DAILY_SIGNALS} (prochain reset à minuit)")
+    if last_signal:
+        print(f"Dernier signal     : {last_signal}\n")
+    else:
+        print("Dernier signal     : Aucun\n")
+
+def display_last_event(message):
+    """Affiche le dernier événement"""
+    width = get_terminal_width()
+    print("DERNIER ÉVÉNEMENT")
+    print("═" * 16)
+    print(message + "\n")
+
+def display_error_zone(error_message=None):
+    """Affiche la zone d'erreurs"""
+    width = get_terminal_width()
+    print("ERREURS ET ALERTES")
+    print("═" * 16)
+    if error_message:
+        print(f"{Colors.RED}{error_message}{Colors.ENDC}\n")
+    else:
+        print("Aucune erreur\n")
+
+def update_display(mode, webhook_url, signal_count, last_signal=None, last_event=None, error=None):
+    """Met à jour l'affichage complet"""
+    display_banner()
+    display_status(mode, webhook_url)
+    display_stats(signal_count, last_signal)
+    if last_event:
+        display_last_event(last_event)
+    display_error_zone(error)
+
+def get_version():
+    """Récupère la version depuis le dernier tag Git"""
+    try:
+        import subprocess
+        result = subprocess.run(['git', 'describe', '--tags', '--abbrev=0'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return "version inconnue"
+    except Exception:
+        return "version inconnue"
+
+def check_email(mail, webhook_url, mode):
     try:
         # Vérifier et réinitialiser le compteur si nécessaire
         reset_signal_counter()
         
-        # Surveillance sur la même ligne
-        log_info("\r[🔍] Surveillance active... (CTRL+C pour arrêter) ", end="")
-        
         try:
             mail.noop()
         except:
-            log_warning(f"\n[🔄] {get_current_time()} La connexion semble inactive, déclenchement d'une reconnexion...")
+            update_display(mode, webhook_url, signal_count, error=f"[🔄] {get_current_time()} La connexion semble inactive, déclenchement d'une reconnexion...")
             raise imaplib.IMAP4.error("Connection check failed")
 
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
 
         if status != "OK" or not messages[0]:
-            print(".", end="", flush=True)
+            update_display(mode, webhook_url, signal_count, last_event=f"[🔍] {get_current_time()} Surveillance active...")
             return
 
         # Récupérer tous les IDs d'emails non lus
@@ -372,90 +452,53 @@ def check_email(mail, webhook_url):
         log_error(f"[📝] {get_current_time()} Détails de l'erreur : {str(e)}")
         raise
 
-def get_version():
-    """Récupère la version depuis le dernier tag Git"""
-    try:
-        import subprocess
-        result = subprocess.run(['git', 'describe', '--tags', '--abbrev=0'], 
-                              capture_output=True, text=True)
-        if result.returncode == 0:
-            return result.stdout.strip()
-        return "version inconnue"
-    except Exception:
-        return "version inconnue"
-
-def display_banner():
-    """Affiche le titre et la description du script"""
-    version = get_version()
-    banner = f"""
-{Colors.BOLD}==================================================
-📧 TradingView Email Monitor {version}
-=================================================={Colors.ENDC}
-
-{Colors.BLUE}Ce script :{Colors.ENDC}
-• Se connecte à iCloud Mail via IMAP
-• Surveille les emails provenant de TradingView, qui applique la stratégie 'Future Trend Channel'
-• Détecte les signaux BUY/SELL dans les messages
-• Transmet les signaux au bot de trading pour qu'il puisse BUY/SELL
-• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux BUY/SELL envoyés par jour pour éviter les emballements
-• Envoie une alerte email si la limite est atteinte
-"""
-    print(banner)
-
 def main():
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
     
-    # Afficher le titre et la description
-    display_banner()
-    
-    log_header(f"[⚙️] {get_current_time()} Mode du serveur webhook : {args.mode} ({webhook_url})")
-    log_header(f"[🛡️] {get_current_time()} Sécurité : Maximum {MAX_DAILY_SIGNALS} signaux par jour")
-
     reconnect_delay = 10
     max_reconnect_delay = 300
 
     while True:
         mail = None
         try:
-            log_info(f"\n[🔌] {get_current_time()} Connexion à iCloud...")
+            update_display(args.mode, webhook_url, 0, last_event=f"[🔌] {get_current_time()} Connexion à iCloud...")
             mail = imaplib.IMAP4_SSL(IMAP_SERVER)
             mail.login(EMAIL_ACCOUNT, APP_PASSWORD)
             mail.select("inbox")
             
             global signal_count
             signal_count = count_todays_signals(mail)
-            log_info(f"[📊] {get_current_time()} {signal_count} signaux déjà traités aujourd'hui")
             
-            log_success(f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView\n")
+            update_display(args.mode, webhook_url, signal_count, last_event=f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView")
             
             reconnect_delay = 10
 
             while True:
-                check_email(mail, webhook_url)
+                check_email(mail, webhook_url, args.mode)
                 time.sleep(10)
 
         except KeyboardInterrupt:
-            log_warning("\n\n[👋] Arrêt du programme...")
+            update_display(args.mode, webhook_url, signal_count, last_event="[👋] Arrêt du programme...")
             try:
                 if mail:
                     mail.close()
                     mail.logout()
-                log_success("[✅] Déconnexion effectuée")
+                update_display(args.mode, webhook_url, signal_count, last_event="[✅] Déconnexion effectuée")
             except:
                 pass
-            log_success("[✅] Programme arrêté")
+            update_display(args.mode, webhook_url, signal_count, last_event="[✅] Programme arrêté")
             sys.exit(0)
 
         except Exception as e:
-            log_error(f"[❌] {get_current_time()} Erreur de connexion : {str(e)}")
+            update_display(args.mode, webhook_url, signal_count, error=f"[❌] {get_current_time()} Erreur de connexion : {str(e)}")
             try:
                 if mail:
                     mail.logout()
             except:
                 pass
 
-            log_warning(f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes...")
+            update_display(args.mode, webhook_url, signal_count, last_event=f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes...")
             time.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
