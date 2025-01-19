@@ -360,7 +360,13 @@ def check_email(mail, webhook_url, mode):
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
 
         if status != "OK" or not messages[0]:
-            update_display(mode, webhook_url, signal_count, last_event=f"[🔍] {get_current_time()} Surveillance active...")
+            # Mise à jour de l'affichage sans ajouter à l'historique
+            display_banner()
+            display_status(mode, webhook_url)
+            display_stats(signal_count)
+            display_last_event(None)  # Ne pas ajouter le message de surveillance
+            display_error_zone(None)
+            print(f"[🔍] {get_current_time()} Surveillance active...")
             return
 
         # Récupérer tous les IDs d'emails non lus
