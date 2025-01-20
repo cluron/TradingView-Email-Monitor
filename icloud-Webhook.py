@@ -106,9 +106,10 @@ MAX_DAILY_SIGNALS = 15
 signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
-# Historique des messages
+# Historique des messages et des signaux
 MAX_MESSAGE_HISTORY = 10  # Nombre de messages à conserver
 message_history = []
+signal_history = []  # Historique des signaux BUY/SELL
 
 def get_current_datetime():
     """Retourne la date et l'heure au format JJ/MM/YYYY HH:MM:SS"""
@@ -122,6 +123,18 @@ def add_to_history(message):
     message_history.append(message_with_date)
     if len(message_history) > MAX_MESSAGE_HISTORY:
         message_history.pop(0)
+
+def add_to_signal_history(signal_type, timestamp=None):
+    """Ajoute un signal à l'historique avec sa date et heure"""
+    global signal_history
+    if timestamp is None:
+        timestamp = get_current_datetime()
+    # Emoji vert pour BUY, rouge pour SELL
+    emoji = "🟢" if signal_type == "BUY" else "🔴"
+    signal_entry = f"[{timestamp}] {emoji} {signal_type}"
+    signal_history.append(signal_entry)
+    if len(signal_history) > MAX_DAILY_SIGNALS:
+        signal_history.pop(0)
 
 def count_todays_signals(mail):
     """Compte le nombre de signaux déjà envoyés aujourd'hui"""
@@ -290,15 +303,18 @@ def display_status(mode, webhook_url):
     print(f"✅ Connexion IMAP établie et vérifiée\n")
 
 def display_stats(signal_count, last_signal=None):
-    """Affiche les statistiques"""
+    """Affiche les statistiques et l'historique des signaux"""
     width = get_terminal_width()
-    print("STATISTIQUES JOURNALIÈRES")
-    print("═" * 24)
+    print("DERNIERS SIGNAUX")
+    print("═" * 16)
     print(f"Signaux traités    : {signal_count}/{MAX_DAILY_SIGNALS} (prochain reset à minuit)")
-    if last_signal:
-        print(f"Dernier signal     : {last_signal}\n")
+    print("Historique :")
+    if signal_history:
+        for signal in reversed(signal_history):
+            print(f"• {signal}")
     else:
-        print("Dernier signal     : Aucun\n")
+        print("• Aucun signal")
+    print()
 
 def display_last_event(message):
     """Affiche le dernier événement et son historique"""
@@ -483,8 +499,8 @@ def check_email(mail, webhook_url, mode):
                 if response.status_code == 200:
                     mail.store(last_valid_id, "+FLAGS", "\\Seen")
                     signal_count += 1
+                    add_to_signal_history(last_valid_signal)  # Ajouter le signal à l'historique
                     update_display(mode, webhook_url, signal_count, 
-                                 last_signal=f"{last_valid_signal} à {get_current_time()}",
                                  last_event=f"[🚀] {get_current_time()} Signal {last_valid_signal} envoyé avec succès")
                 else:
                     update_display(mode, webhook_url, signal_count, 
