@@ -336,6 +336,7 @@ def display_error_zone(error_message=None):
     width = get_terminal_width()
     print("ALERTES ET ERREURS")
     print("═" * 16)
+    print(f"Historique ({len(message_history)}/{MAX_MESSAGE_HISTORY}) :")
     if error_message:
         print(f"{Colors.RED}{error_message}{Colors.ENDC}")
         # Ajouter l'erreur à l'historique des messages
