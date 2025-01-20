@@ -337,12 +337,18 @@ def display_error_zone(error_message=None):
     print("ALERTES ET ERREURS")
     print("═" * 16)
     print(f"Historique ({len(message_history)}/{MAX_MESSAGE_HISTORY}) :")
+    
     if error_message:
         print(f"{Colors.RED}{error_message}{Colors.ENDC}")
         # Ajouter l'erreur à l'historique des messages
         add_to_history(error_message)
+    
+    if message_history:
+        for msg in reversed(message_history):
+            print(msg)
     else:
         print("Aucune erreur")
+    
     print()
     # Ajouter le message d'aide pour quitter
     print(f"{Colors.BLUE}Pour quitter le programme, appuyez sur Ctrl+C{Colors.ENDC}")
