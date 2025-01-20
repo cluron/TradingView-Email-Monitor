@@ -317,20 +317,24 @@ def display_last_event(message):
 def display_error_zone(error_message=None):
     """Affiche la zone d'erreurs"""
     width = get_terminal_width()
-    print("ERREURS ET ALERTES")
+    print("ALERTES ET ERREURS")
     print("═" * 16)
     if error_message:
-        print(f"{Colors.RED}{error_message}{Colors.ENDC}\n")
+        print(f"{Colors.RED}{error_message}{Colors.ENDC}")
+        # Ajouter l'erreur à l'historique des messages
+        add_to_history(error_message)
     else:
-        print("Aucune erreur\n")
+        print("Aucune erreur")
+    print()
+    # Ajouter le message d'aide pour quitter
+    print(f"{Colors.BLUE}Pour quitter le programme, appuyez sur Ctrl+C{Colors.ENDC}")
 
 def update_display(mode, webhook_url, signal_count, last_signal=None, last_event=None, error=None):
     """Met à jour l'affichage complet"""
     display_banner()
     display_status(mode, webhook_url)
     display_stats(signal_count, last_signal)
-    if last_event:
-        display_last_event(last_event)
+    display_last_event(last_event)
     display_error_zone(error)
 
 def get_version():
