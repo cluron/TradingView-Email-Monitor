@@ -308,7 +308,7 @@ def display_stats(signal_count, last_signal=None):
     print("DERNIERS SIGNAUX")
     print("═" * 16)
     print(f"Signaux traités    : {signal_count}/{MAX_DAILY_SIGNALS} (prochain reset à minuit)")
-    print("Historique :")
+    print(f"Historique ({len(signal_history)}/{MAX_DAILY_SIGNALS}) :")
     if signal_history:
         for signal in reversed(signal_history):
             print(f"• {signal}")
@@ -326,6 +326,7 @@ def display_last_event(message):
         add_to_history(message)
     
     # Afficher l'historique du plus récent au plus ancien
+    print(f"Historique ({len(message_history)}/{MAX_MESSAGE_HISTORY}) :")
     for msg in reversed(message_history):
         print(msg)
     print()
