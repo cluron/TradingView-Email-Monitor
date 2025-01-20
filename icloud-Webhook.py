@@ -23,7 +23,10 @@ import sys
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from config import *
+from config import (IMAP_SERVER, EMAIL_ACCOUNT, APP_PASSWORD, 
+                   WEBHOOK_URL_LOCAL, WEBHOOK_URL_PUBLIC, WEBHOOK_TOKEN,
+                   MAX_SIGNAL_HISTORY, MAX_EVENT_HISTORY, MAX_ALERT_HISTORY,
+                   MAX_DAILY_SIGNALS, CHECK_INTERVAL, RECONNECT_DELAY, MAX_RECONNECT_DELAY)
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo  # Ajout de l'import pour les fuseaux horaires
 import os
@@ -102,13 +105,10 @@ HEADERS = {
 }
 
 # Sécurité : compteur de signaux
-MAX_DAILY_SIGNALS = 15
 signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
 # Historique des messages et des signaux
-MAX_MESSAGE_HISTORY = 10  # Nombre de messages à conserver pour les événements
-MAX_ALERT_HISTORY = 30   # Nombre de messages à conserver pour les alertes et erreurs
 message_history = []      # Pour les événements relatifs aux signaux
 alert_history = []       # Pour les alertes et erreurs
 signal_history = []      # Historique des signaux BUY/SELL
@@ -129,7 +129,7 @@ def add_to_history(message, is_alert=False):
             alert_history.pop(0)
     else:
         message_history.append(message_with_date)
-        if len(message_history) > MAX_MESSAGE_HISTORY:
+        if len(message_history) > MAX_EVENT_HISTORY:
             message_history.pop(0)
 
 def add_to_signal_history(signal_type, timestamp=None):
@@ -141,7 +141,7 @@ def add_to_signal_history(signal_type, timestamp=None):
     emoji = "🟢" if signal_type == "BUY" else "🔴"
     signal_entry = f"[{timestamp}] {emoji} {signal_type}"
     signal_history.append(signal_entry)
-    if len(signal_history) > MAX_DAILY_SIGNALS:
+    if len(signal_history) > MAX_SIGNAL_HISTORY:
         signal_history.pop(0)
 
 def count_todays_signals(mail):
@@ -316,7 +316,7 @@ def display_stats(signal_count, last_signal=None):
     print("DERNIERS SIGNAUX")
     print("═" * 16)
     print(f"Signaux traités    : {signal_count}/{MAX_DAILY_SIGNALS} (prochain reset à minuit)")
-    print(f"Historique ({len(signal_history)}/{MAX_DAILY_SIGNALS}) :")
+    print(f"Historique ({len(signal_history)}/{MAX_SIGNAL_HISTORY}) :")
     if signal_history:
         for signal in reversed(signal_history):
             print(f"• {signal}")
@@ -334,7 +334,7 @@ def display_last_event(message):
         add_to_history(message)
     
     # Afficher l'historique du plus récent au plus ancien
-    print(f"Historique ({len(message_history)}/{MAX_MESSAGE_HISTORY}) :")
+    print(f"Historique ({len(message_history)}/{MAX_EVENT_HISTORY}) :")
     for msg in reversed(message_history):
         print(msg)
     print()
@@ -535,8 +535,7 @@ def main():
     args = parse_arguments()
     webhook_url = get_webhook_url(args.mode)
     
-    reconnect_delay = 10
-    max_reconnect_delay = 300
+    reconnect_delay = RECONNECT_DELAY
 
     while True:
         mail = None
@@ -555,11 +554,11 @@ def main():
             
             update_display(args.mode, webhook_url, signal_count)
             
-            reconnect_delay = 10
+            reconnect_delay = RECONNECT_DELAY
 
             while True:
                 check_email(mail, webhook_url, args.mode)
-                time.sleep(10)
+                time.sleep(CHECK_INTERVAL)
 
         except KeyboardInterrupt:
             # Ajouter le message d'arrêt dans les alertes
@@ -588,7 +587,7 @@ def main():
             add_to_history(reconnect_msg, is_alert=True)
             update_display(args.mode, webhook_url, signal_count)
             time.sleep(reconnect_delay)
-            reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 2, MAX_RECONNECT_DELAY)
 
 if __name__ == "__main__":
     main()
