@@ -107,22 +107,30 @@ signal_count = 0
 last_signal_date = datetime.now(timezone.utc).date()
 
 # Historique des messages et des signaux
-MAX_MESSAGE_HISTORY = 10  # Nombre de messages à conserver
-message_history = []
-signal_history = []  # Historique des signaux BUY/SELL
+MAX_MESSAGE_HISTORY = 10  # Nombre de messages à conserver pour les événements
+MAX_ALERT_HISTORY = 30   # Nombre de messages à conserver pour les alertes et erreurs
+message_history = []      # Pour les événements relatifs aux signaux
+alert_history = []       # Pour les alertes et erreurs
+signal_history = []      # Historique des signaux BUY/SELL
 
 def get_current_datetime():
     """Retourne la date et l'heure au format JJ/MM/YYYY HH:MM:SS"""
     return datetime.now(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y %H:%M:%S")
 
-def add_to_history(message):
+def add_to_history(message, is_alert=False):
     """Ajoute un message à l'historique avec la date et l'heure"""
-    global message_history
+    global message_history, alert_history
     # Ajouter la date et l'heure au début du message
     message_with_date = f"[{get_current_datetime()}] {message}"
-    message_history.append(message_with_date)
-    if len(message_history) > MAX_MESSAGE_HISTORY:
-        message_history.pop(0)
+    
+    if is_alert:
+        alert_history.append(message_with_date)
+        if len(alert_history) > MAX_ALERT_HISTORY:
+            alert_history.pop(0)
+    else:
+        message_history.append(message_with_date)
+        if len(message_history) > MAX_MESSAGE_HISTORY:
+            message_history.pop(0)
 
 def add_to_signal_history(signal_type, timestamp=None):
     """Ajoute un signal à l'historique avec sa date et heure"""
@@ -319,10 +327,10 @@ def display_stats(signal_count, last_signal=None):
 def display_last_event(message):
     """Affiche le dernier événement et son historique"""
     width = get_terminal_width()
-    print("DERNIERS ÉVÉNEMENTS")
-    print("═" * 18)
+    print("DERNIERS ÉVÉNEMENTS RELATIFS AUX SIGNAUX")
+    print("═" * 35)
     
-    if message:
+    if message and not message.startswith('[🔌]') and not message.startswith('[✅]'):
         add_to_history(message)
     
     # Afficher l'historique du plus récent au plus ancien
@@ -336,18 +344,18 @@ def display_error_zone(error_message=None):
     width = get_terminal_width()
     print("ALERTES ET ERREURS")
     print("═" * 16)
-    print(f"Historique ({len(message_history)}/{MAX_MESSAGE_HISTORY}) :")
+    print(f"Historique ({len(alert_history)}/{MAX_ALERT_HISTORY}) :")
     
     if error_message:
         print(f"{Colors.RED}{error_message}{Colors.ENDC}")
-        # Ajouter l'erreur à l'historique des messages
-        add_to_history(error_message)
+        # Ajouter l'erreur à l'historique des alertes
+        add_to_history(error_message, is_alert=True)
     
-    if message_history:
-        for msg in reversed(message_history):
+    if alert_history:
+        for msg in reversed(alert_history):
             print(msg)
     else:
-        print("Aucune erreur")
+        print("Aucune alerte ni erreur")
     
     print()
     # Ajouter le message d'aide pour quitter
@@ -376,9 +384,7 @@ def get_version():
 def check_email(mail, webhook_url, mode):
     global signal_count
     try:
-        # Vérifier et réinitialiser le compteur si nécessaire
-        reset_signal_counter()
-        
+        # Vérifier la connexion sans ajouter de message
         try:
             mail.noop()
         except:
@@ -386,13 +392,13 @@ def check_email(mail, webhook_url, mode):
             raise imaplib.IMAP4.error("Connection check failed")
 
         status, messages = mail.search(None, 'UNSEEN FROM "noreply@tradingview.com"')
-
+        
         if status != "OK" or not messages[0]:
             # Mise à jour de l'affichage sans ajouter à l'historique
             display_banner()
             display_status(mode, webhook_url)
             display_stats(signal_count)
-            display_last_event(None)  # Ne pas ajouter le message de surveillance
+            display_last_event(None)
             display_error_zone(None)
             print(f"[🔍] {get_current_time()} Surveillance active...")
             return
@@ -522,7 +528,7 @@ def check_email(mail, webhook_url, mode):
 
     except Exception as e:
         update_display(mode, webhook_url, signal_count, 
-                      error=f"[❌] {get_current_time()} Erreur lors de la vérification des emails : {e}\n[📝] Détails : {str(e)}")
+                      error=f"[❌] {get_current_time()} Erreur lors de la vérification des emails : {str(e)}")
         raise
 
 def main():
@@ -543,7 +549,11 @@ def main():
             global signal_count
             signal_count = count_todays_signals(mail)
             
-            update_display(args.mode, webhook_url, signal_count, last_event=f"[✅] {get_current_time()} Connecté et prêt à surveiller les emails de TradingView")
+            # Ajouter les messages de connexion une seule fois dans les alertes
+            add_to_history("[🔌] Connexion à iCloud...", is_alert=True)
+            add_to_history("[✅] Connecté et prêt à surveiller les emails de TradingView", is_alert=True)
+            
+            update_display(args.mode, webhook_url, signal_count)
             
             reconnect_delay = 10
 
@@ -552,26 +562,31 @@ def main():
                 time.sleep(10)
 
         except KeyboardInterrupt:
-            update_display(args.mode, webhook_url, signal_count, last_event="[👋] Arrêt du programme...")
+            # Ajouter le message d'arrêt dans les alertes
+            add_to_history("[👋] Arrêt du programme...", is_alert=True)
             try:
                 if mail:
                     mail.close()
                     mail.logout()
-                update_display(args.mode, webhook_url, signal_count, last_event="[✅] Déconnexion effectuée")
+                add_to_history("[✅] Déconnexion effectuée", is_alert=True)
             except:
                 pass
-            update_display(args.mode, webhook_url, signal_count, last_event="[✅] Programme arrêté")
+            add_to_history("[✅] Programme arrêté", is_alert=True)
+            update_display(args.mode, webhook_url, signal_count)
             sys.exit(0)
 
         except Exception as e:
-            update_display(args.mode, webhook_url, signal_count, error=f"[❌] {get_current_time()} Erreur de connexion : {str(e)}")
+            error_msg = f"[❌] {get_current_time()} Erreur de connexion : {str(e)}"
+            add_to_history(error_msg, is_alert=True)
             try:
                 if mail:
                     mail.logout()
             except:
                 pass
 
-            update_display(args.mode, webhook_url, signal_count, last_event=f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes...")
+            reconnect_msg = f"[🔄] {get_current_time()} Nouvelle tentative dans {reconnect_delay} secondes..."
+            add_to_history(reconnect_msg, is_alert=True)
+            update_display(args.mode, webhook_url, signal_count)
             time.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
