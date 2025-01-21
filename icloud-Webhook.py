@@ -120,8 +120,13 @@ def get_current_datetime():
 def add_to_history(message, is_alert=False):
     """Ajoute un message à l'historique avec la date et l'heure"""
     global message_history, alert_history
-    # Ajouter la date et l'heure au début du message
-    message_with_date = f"[{get_current_datetime()}] {message}"
+    
+    # Si le message commence déjà par un timestamp entre crochets, on le garde tel quel
+    if message.startswith('[') and ']' in message:
+        message_with_date = message
+    else:
+        # Sinon, on ajoute la date et l'heure au début du message
+        message_with_date = f"[{get_current_datetime()}] {message}"
     
     if is_alert:
         alert_history.append(message_with_date)
@@ -299,7 +304,7 @@ def display_banner():
 
     print(f"{Colors.BLUE}Ce script :{Colors.ENDC}")
     print("• Se connecte à iCloud Mail via IMAP")
-    print("• Surveille les emails provenant de TradingView, qui applique la stratégie 'Future Trend Channel'")
+    print("• Surveille les emails provenant des alertes de la stratégie TradingView en place")
     print("• Détecte les signaux BUY/SELL dans les messages")
     print("• Transmet les signaux au bot de trading pour qu'il puisse BUY/SELL")
     print(f"• Limite à {Colors.BOLD}{MAX_DAILY_SIGNALS}{Colors.ENDC} signaux BUY/SELL envoyés par jour pour éviter les emballements")
