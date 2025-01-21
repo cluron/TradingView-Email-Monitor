@@ -348,8 +348,11 @@ def display_last_event(message):
     
     # Afficher l'historique du plus récent au plus ancien
     print(f"Historique ({len(message_history)}/{MAX_EVENT_HISTORY}) :")
-    for msg in reversed(message_history):
-        print(msg)
+    if message_history:
+        for msg in reversed(message_history):
+            print(msg)
+    else:
+        print("• Aucun événement")
     print()
 
 def display_error_zone(error_message=None):
