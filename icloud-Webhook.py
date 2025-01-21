@@ -121,12 +121,19 @@ def add_to_history(message, is_alert=False):
     """Ajoute un message à l'historique avec la date et l'heure"""
     global message_history, alert_history
     
-    # Si le message commence déjà par un timestamp entre crochets, on le garde tel quel
+    # Extraire l'icône si elle existe (format [emoji])
+    icon = ""
     if message.startswith('[') and ']' in message:
-        message_with_date = message
-    else:
-        # Sinon, on ajoute la date et l'heure au début du message
-        message_with_date = f"[{get_current_datetime()}] {message}"
+        icon_end = message.find(']') + 1
+        icon = message[:icon_end]
+        message = message[icon_end:].strip()
+        
+        # Si le message contient un timestamp après l'icône, on le supprime
+        if message.startswith('[') and ']' in message:
+            message = message.split('] ', 1)[1]
+    
+    # Ajouter le timestamp complet au début, suivi de l'icône si elle existe
+    message_with_date = f"[{get_current_datetime()}] {icon} {message}" if icon else f"[{get_current_datetime()}] {message}"
     
     if is_alert:
         alert_history.append(message_with_date)
@@ -295,13 +302,14 @@ def display_banner():
     """Affiche le titre et la description du script"""
     version = get_version()
     width = get_terminal_width()
-    separator = "═" * width
+    separator = "─" * width
 
     clear_screen()
-    print(f"\n{separator}")
+    print(separator)
+    print("")  # Ligne vide avant le titre
     print(f"📧 TradingView Email Monitor {version}".center(width))
-    print(f"{separator}\n")
-
+    print("")  # Ligne vide avant le titre
+    print(f"{separator}")
     print(f"{Colors.BLUE}Ce script :{Colors.ENDC}")
     print("• Se connecte à iCloud Mail via IMAP")
     print("• Surveille les emails provenant des alertes de la stratégie TradingView en place")
@@ -318,8 +326,8 @@ def display_status(mode, webhook_url):
 def display_stats(signal_count, last_signal=None):
     """Affiche les statistiques et l'historique des signaux"""
     width = get_terminal_width()
-    print("DERNIERS SIGNAUX")
-    print("═" * 16)
+    print(f"\n📊 DERNIERS SIGNAUX")
+    print("─" * width)
     print(f"Signaux traités    : {signal_count}/{MAX_DAILY_SIGNALS} (prochain reset à minuit)")
     print(f"Historique ({len(signal_history)}/{MAX_SIGNAL_HISTORY}) :")
     if signal_history:
@@ -332,8 +340,8 @@ def display_stats(signal_count, last_signal=None):
 def display_last_event(message):
     """Affiche le dernier événement et son historique"""
     width = get_terminal_width()
-    print("DERNIERS ÉVÉNEMENTS RELATIFS AUX SIGNAUX")
-    print("═" * 35)
+    print(f"\n📝 DERNIERS ÉVÉNEMENTS RELATIFS AUX SIGNAUX")
+    print("─" * width)
     
     if message and not message.startswith('[🔌]') and not message.startswith('[✅]'):
         add_to_history(message)
@@ -347,8 +355,8 @@ def display_last_event(message):
 def display_error_zone(error_message=None):
     """Affiche la zone d'erreurs"""
     width = get_terminal_width()
-    print("ALERTES ET ERREURS")
-    print("═" * 16)
+    print(f"\n⚠️ ALERTES ET ERREURS")
+    print("─" * width)
     print(f"Historique ({len(alert_history)}/{MAX_ALERT_HISTORY}) :")
     
     if error_message:
