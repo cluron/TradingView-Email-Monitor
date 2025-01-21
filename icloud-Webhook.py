@@ -305,10 +305,10 @@ def display_banner():
     separator = "─" * width
 
     clear_screen()
+    print("")  # Ligne vide avant le titre
     print(separator)
     print("")  # Ligne vide avant le titre
     print(f"📧 TradingView Email Monitor {version}".center(width))
-    print("")  # Ligne vide avant le titre
     print(f"{separator}")
     print(f"{Colors.BLUE}Ce script :{Colors.ENDC}")
     print("• Se connecte à iCloud Mail via IMAP")
