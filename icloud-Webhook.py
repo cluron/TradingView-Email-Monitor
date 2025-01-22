@@ -341,14 +341,12 @@ def display_stats(signal_count, last_signal=None):
 def display_last_event(message):
     """Affiche le dernier événement et son historique"""
     width = get_terminal_width()
-    print(f"\n📝 DERNIERS ÉVÉNEMENTS RELATIFS AUX SIGNAUX")
+    print(f"\n📝 DERNIERS ÉVÉNEMENTS RELATIFS AUX SIGNAUX ({len(message_history)}/{MAX_EVENT_HISTORY})")
     print("─" * width)
     
     if message and not message.startswith('[🔌]') and not message.startswith('[✅]'):
         add_to_history(message)
     
-    # Afficher l'historique du plus récent au plus ancien
-    print(f"Historique ({len(message_history)}/{MAX_EVENT_HISTORY}) :")
     if message_history:
         for msg in reversed(message_history):
             print(msg)
@@ -359,9 +357,8 @@ def display_last_event(message):
 def display_error_zone(error_message=None):
     """Affiche la zone d'erreurs"""
     width = get_terminal_width()
-    print(f"\n⚠️ ALERTES ET ERREURS")
+    print(f"\n⚠️ ALERTES ET ERREURS ({len(alert_history)}/{MAX_ALERT_HISTORY})")
     print("─" * width)
-    print(f"Historique ({len(alert_history)}/{MAX_ALERT_HISTORY}) :")
     
     if error_message:
         print(f"{Colors.RED}{error_message}{Colors.ENDC}")
